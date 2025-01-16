@@ -68,7 +68,7 @@ Relevant professional experience {data-icon=suitcase}
 
 <i class="fa fa-github"></i> [GitHub: `@`moraessaur](https://github.com/moraessaur)
 
-<i class="fab fa-linkedin-in"></i> [LinkedIn](https://www.linkedin.com/in/lucas-moraes-78944a32/)
+<i class="fab fa-linkedin-in"></i> [LinkedIn](https://www.linkedin.com/in/lucas-moraes-msc-78944a32/)
 
 :::
 
