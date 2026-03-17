@@ -22,7 +22,7 @@ source("cv_printing_functions.r")
 
 # Read in all data and initialize a CV printer object
 CV <- create_CV_object(
-  data_location = "https://docs.google.com/spreadsheets/d/14kGTmkbdcPvun4KlRWy9nfTsVaIdvunwqJF7rMUGYpA/edit?usp=sharing",  
+  data_location = "https://docs.google.com/spreadsheets/d/1mIF3aDXQJOPzfPJqOmbdY4QMsa_asKxsjb7AieAB7xA/edit?usp=sharing",  
   pdf_mode = params$pdf_mode
 )
 ```
@@ -101,13 +101,17 @@ CV %<>% print_text_block('recent_professional_experience_aside')
 **Technical stack**
 **__________________**
 
+<i class="fa-solid fa-code-merge"></i> **Git**
+
 <i class="fab fa-r-project"></i> **R**
 
 <i class="fab fa-python"></i> **Python**
 
 <i class="fa fa-database"></i> **SQL**
 
-**Spark**
+<i class="fa-solid fa-star"></i> **Spark**
+
+<i class="fa-solid fa-circle-nodes"></i> **Data Bricks**
 
 <i class="fas fa-chart-bar"></i> **Statistics**
 
@@ -117,7 +121,6 @@ CV %<>% print_text_block('recent_professional_experience_aside')
 
 <i class="fas fa-award"></i> **Fluent english**
 
-<i class="fas fa-users"></i> **Soft Skills**
 :::
 
 
