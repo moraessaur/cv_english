@@ -2,3 +2,12 @@
 .Rhistory
 .RData
 .Ruserdata
+
+# LLM cache
+data/llm_cache/
+
+# Outputs
+output/
+
+# Secrets
+.Renviron
