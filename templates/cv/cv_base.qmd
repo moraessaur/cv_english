@@ -1,0 +1,61 @@
+---
+title: "CV"
+output:
+  html_document:
+    self_contained: true
+params:
+  payload: NULL
+---
+
+```{r setup, include=FALSE}
+payload <- params$payload
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+```
+
+```{r}
+print_section_simple <- function(section_df) {
+  if (is.null(section_df) || nrow(section_df) == 0) {
+    return(invisible(NULL))
+  }
+
+  for (i in seq_len(nrow(section_df))) {
+    cat("### ", section_df$title[i], "\n\n", sep = "")
+
+    display_place <- ifelse(
+      !is.na(section_df$institution[i]) && section_df$institution[i] != "N/A",
+      section_df$institution[i],
+      section_df$loc[i]
+    )
+
+    cat(display_place, "\n\n")
+    cat(section_df$timeline[i], "\n\n")
+
+    bullets <- section_df$description_bullets[i]
+    if (!is.na(bullets) && nzchar(bullets)) {
+      cat(bullets, "\n\n")
+    }
+
+    cat("\n")
+  }
+
+  invisible(NULL)
+}
+```
+
+```{r}
+if (!is.null(payload$intro)) {
+  cat(payload$intro, "\n\n")
+}
+```
+
+```{r}
+print_section_simple(payload$sections$recent_professional_experience)
+```
+
+```{r}
+print_section_simple(payload$sections$education)
+```
+
+```{r}
+print_section_simple(payload$sections$academic_articles)
+```
