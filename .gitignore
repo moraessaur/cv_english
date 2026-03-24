@@ -3,6 +3,8 @@
 .RData
 .Ruserdata
 
+.*csv
+
 # LLM cache
 data/llm_cache/
 

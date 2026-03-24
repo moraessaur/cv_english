@@ -1,0 +1,437 @@
+```{r}
+library(tidyverse)
+library(readxl)
+library(readr)
+```
+
+```{r}
+x <- read_excel('cv_data.xlsx')
+```
+
+```{r}
+Sys.setenv(OPENAI_API_KEY = "")
+```
+
+```{r}
+description_cols <- c(
+  "description_1",
+  "description_2",
+  "description_3",
+  "description_4",
+  "description_5"
+)
+
+updated_entries <- alter_dataframe_text(
+  df = cv$entries_data,
+  instruction = "Rewrite the descriptions so they sound more corporate, polished, and professional. Do not invent experience, tools, or metrics. Keep the meaning faithful.",
+  text_columns = description_cols,
+  model = "gpt-4.1-mini",
+  api_key = ""
+)
+```
+
+```{r}
+library(gptr)
+library(httr2)
+library(jsonlite)
+library(dplyr)
+
+alter_dataframe_text <- function(
+  df,
+  instruction,
+  text_columns = NULL,
+  model = "gpt-4.1-mini",
+  api_key
+) {
+  if (missing(api_key) || is.null(api_key) || api_key == "") {
+    stop("You must provide a valid OpenAI API key.")
+  }
+
+  if (missing(instruction) || is.null(instruction) || instruction == "") {
+    stop("You must provide an instruction string.")
+  }
+
+  if (!is.data.frame(df)) {
+    stop("`df` must be a dataframe.")
+  }
+
+  # Default: alter all character columns
+  if (is.null(text_columns)) {
+    text_columns <- names(df)[vapply(df, is.character, logical(1))]
+  }
+
+  if (length(text_columns) == 0) {
+    stop("No text columns found to alter.")
+  }
+
+  missing_cols <- setdiff(text_columns, names(df))
+  if (length(missing_cols) > 0) {
+    stop(
+      paste(
+        "These columns are not in the dataframe:",
+        paste(missing_cols, collapse = ", ")
+      )
+    )
+  }
+
+  # Build payload with row id
+  payload_df <- df %>%
+    mutate(.row_id = row_number()) %>%
+    select(.row_id, all_of(text_columns))
+
+  df_json <- jsonlite::toJSON(
+    payload_df,
+    dataframe = "rows",
+    auto_unbox = TRUE,
+    pretty = TRUE,
+    na = "null"
+  )
+
+  prompt_text <- paste0(
+    "You will receive a JSON array representing rows from a dataframe.\n\n",
+    "Your task is to modify ONLY these columns: ",
+    paste(text_columns, collapse = ", "),
+    ".\n\n",
+    "User instruction:\n",
+    instruction,
+    "\n\n",
+    "Rules:\n",
+    "- Preserve the number of rows exactly.\n",
+    "- Preserve .row_id exactly.\n",
+    "- Return exactly one object per input row.\n",
+    "- Return ONLY raw JSON.\n",
+    "- Do not include markdown.\n",
+    "- Do not include explanations.\n",
+    "- Do not add or remove columns.\n",
+    "- Keep null values as null.\n",
+    "- Only change the requested text content.\n\n",
+    "Return a JSON array of objects with exactly these keys:\n",
+    paste(c(".row_id", text_columns), collapse = ", "),
+    "\n\n",
+    "Input data:\n",
+    df_json
+  )
+
+  req_body <- list(
+    model = model,
+    input = list(
+      list(
+        role = "user",
+        content = list(
+          list(
+            type = "input_text",
+            text = prompt_text
+          )
+        )
+      )
+    )
+  )
+
+  safe_openai_post <- function(req) {
+    resp <- req_perform(req)
+    status <- resp_status(resp)
+    body <- resp_body_string(resp)
+
+    if (status >= 400) {
+      cat("HTTP status:", status, "\n")
+      cat(body, "\n")
+      stop("OpenAI request failed. See body above.")
+    }
+
+    resp
+  }
+
+  extract_output_text <- function(resp_json) {
+    if (!is.null(resp_json$output_text)) {
+      return(resp_json$output_text)
+    }
+
+    if (!is.null(resp_json$output) &&
+        length(resp_json$output) > 0 &&
+        !is.null(resp_json$output[[1]]$content) &&
+        length(resp_json$output[[1]]$content) > 0 &&
+        !is.null(resp_json$output[[1]]$content[[1]]$text)) {
+      return(resp_json$output[[1]]$content[[1]]$text)
+    }
+
+    stop("Could not extract text output from the API response.")
+  }
+
+  clean_json_array <- function(x) {
+    x <- gsub("```json", "", x, fixed = TRUE)
+    x <- gsub("```", "", x, fixed = TRUE)
+    x <- trimws(x)
+
+    start_pos <- regexpr("\\[", x)
+    end_pos <- max(gregexpr("\\]", x)[[1]])
+
+    if (start_pos[1] == -1 || end_pos[1] == -1) {
+      stop("Could not find a JSON array in the model output.")
+    }
+
+    substr(x, start_pos[1], end_pos[1])
+  }
+
+  req <- request("https://api.openai.com/v1/responses") %>%
+    req_headers(
+      Authorization = paste("Bearer", api_key),
+      `Content-Type` = "application/json"
+    ) %>%
+    req_body_json(req_body, auto_unbox = TRUE)
+
+  resp <- safe_openai_post(req)
+  resp_json <- resp_body_json(resp)
+
+  out_text <- extract_output_text(resp_json)
+  cleaned <- clean_json_array(out_text)
+
+  rewritten <- jsonlite::fromJSON(cleaned, simplifyDataFrame = TRUE)
+
+  if (!is.data.frame(rewritten)) {
+    stop("Parsed output is not a dataframe.")
+  }
+
+  expected_cols <- c(".row_id", text_columns)
+  missing_returned <- setdiff(expected_cols, names(rewritten))
+  if (length(missing_returned) > 0) {
+    stop(
+      paste(
+        "The model output is missing these expected columns:",
+        paste(missing_returned, collapse = ", ")
+      )
+    )
+  }
+
+  if (nrow(rewritten) != nrow(df)) {
+    stop(
+      paste0(
+        "Row count mismatch. Input rows: ", nrow(df),
+        "; returned rows: ", nrow(rewritten), "."
+      )
+    )
+  }
+
+  rewritten <- rewritten %>%
+    arrange(.row_id)
+
+  result <- df %>%
+    mutate(.row_id = row_number()) %>%
+    left_join(
+      rewritten %>% select(all_of(expected_cols)),
+      by = ".row_id",
+      suffix = c("", "__new")
+    )
+
+  for (col in text_columns) {
+    new_col <- paste0(col, "__new")
+    result[[col]] <- result[[new_col]]
+    result[[new_col]] <- NULL
+  }
+
+  result$.row_id <- NULL
+
+  result
+}
+
+
+# Example 1
+#response1 <- get_response(user_input = "How to calculate the bonforoni corrected p values?")
+```
+
+```{r}
+
+response2 <- get_response(user_input = paste0("Based on this data.frame in R: \n\n",
+                                               dataframe_to_text(cv$entries_data),
+                                               "\n\n can you rewrite the descriptions for each role in recent professional experience to something more corporate oriented? give me a dataframe as output with the updated text blocks"))
+```
+
+```{r}
+library(httr2)
+library(jsonlite)
+library(dplyr)
+
+rewrite_entries <- function(df, api_key, model = "gpt-4.1-mini") {
+  library(httr2)
+  library(jsonlite)
+  library(dplyr)
+  library(tidyr)
+
+  required_cols <- c(
+    "title", "institution", "loc", "start", "end",
+    "description_1", "description_2", "description_3",
+    "description_4", "description_5"
+  )
+
+  missing_cols <- setdiff(required_cols, names(df))
+  if (length(missing_cols) > 0) {
+    stop(
+      paste(
+        "The dataframe is missing these required columns:",
+        paste(missing_cols, collapse = ", ")
+      )
+    )
+  }
+
+  # Build a temporary payload for the model
+  payload_df <- df %>%
+    mutate(
+      row_id = row_number(),
+      timeline = paste(
+        ifelse(is.na(start), "", as.character(start)),
+        ifelse(is.na(end), "", as.character(end)),
+        sep = " - "
+      ),
+      timeline = trimws(timeline),
+      description_bullets = paste(
+        dplyr::coalesce(as.character(description_1), ""),
+        dplyr::coalesce(as.character(description_2), ""),
+        dplyr::coalesce(as.character(description_3), ""),
+        dplyr::coalesce(as.character(description_4), ""),
+        dplyr::coalesce(as.character(description_5), ""),
+        sep = "\n"
+      ),
+      description_bullets = gsub("\n+", "\n", description_bullets),
+      description_bullets = gsub("(^\n+|\n+$)", "", description_bullets)
+    ) %>%
+    select(row_id, title, institution, loc, timeline, description_bullets)
+
+  # Convert dataframe to JSON safely
+  df_json <- jsonlite::toJSON(
+    payload_df,
+    dataframe = "rows",
+    auto_unbox = TRUE,
+    pretty = TRUE,
+    na = "null"
+  )
+
+  prompt_text <- paste0(
+    "You will receive a JSON array representing rows from a CV dataframe.\n",
+    "Rewrite ONLY the field `description_bullets` for each row so it sounds more corporate, polished, and professional.\n",
+    "Keep the meaning faithful to the original text.\n",
+    "Do not invent tools, metrics, achievements, responsibilities, or experience that are not already present.\n",
+    "Preserve the number of bullet points whenever possible.\n",
+    "Return ONLY valid JSON as an array of objects with exactly these fields:\n",
+    "row_id, description_bullets\n\n",
+    "IMPORTANT:\n",
+    "- Keep bullet points separated by newline characters.\n",
+    "- Do not include markdown.\n",
+    "- Do not include any extra fields.\n\n",
+    "Input data:\n",
+    df_json
+  )
+
+  req_body <- list(
+    model = model,
+    input = list(
+      list(
+        role = "user",
+        content = list(
+          list(
+            type = "input_text",
+            text = prompt_text
+          )
+        )
+      )
+    ),
+    text = list(
+      format = list(
+        type = "json_schema",
+        name = "rewritten_cv_rows",
+        schema = list(
+          type = "array",
+          items = list(
+            type = "object",
+            properties = list(
+              row_id = list(type = "integer"),
+              description_bullets = list(type = "string")
+            ),
+            required = list("row_id", "description_bullets"),
+            additionalProperties = FALSE
+          )
+        )
+      )
+    )
+  )
+
+  resp <- request("https://api.openai.com/v1/responses") %>%
+    req_headers(
+      Authorization = paste("Bearer", api_key),
+      `Content-Type` = "application/json"
+    ) %>%
+    req_body_json(req_body, auto_unbox = TRUE) %>%
+    req_perform()
+
+  resp_json <- resp_body_json(resp)
+
+  # Try to extract the returned text robustly
+  out_text <- NULL
+
+  if (!is.null(resp_json$output_text)) {
+    out_text <- resp_json$output_text
+  } else if (!is.null(resp_json$output[[1]]$content[[1]]$text)) {
+    out_text <- resp_json$output[[1]]$content[[1]]$text
+  } else {
+    stop("Could not extract text output from the API response.")
+  }
+
+  rewritten <- jsonlite::fromJSON(out_text)
+
+  if (!all(c("row_id", "description_bullets") %in% names(rewritten))) {
+    stop("The model output did not contain the expected fields: row_id, description_bullets")
+  }
+
+  # Join rewritten text back
+  df_out <- payload_df %>%
+    select(row_id) %>%
+    left_join(rewritten, by = "row_id") %>%
+    mutate(
+      description_bullets = gsub("\r\n", "\n", description_bullets),
+      description_bullets = gsub("\n+", "\n", description_bullets),
+      description_bullets = gsub("(^\n+|\n+$)", "", description_bullets)
+    ) %>%
+    tidyr::separate(
+      description_bullets,
+      into = c(
+        "description_1",
+        "description_2",
+        "description_3",
+        "description_4",
+        "description_5"
+      ),
+      sep = "\n",
+      fill = "right",
+      extra = "merge",
+      remove = FALSE
+    )
+
+  # Replace original description columns with rewritten ones
+  result <- df %>%
+    mutate(
+      description_1 = df_out$description_1,
+      description_2 = df_out$description_2,
+      description_3 = df_out$description_3,
+      description_4 = df_out$description_4,
+      description_5 = df_out$description_5
+    )
+
+  return(result)
+}
+```
+
+
+```{r}
+data_location <- 'https://docs.google.com/spreadsheets/d/1mIF3aDXQJOPzfPJqOmbdY4QMsa_asKxsjb7AieAB7xA/edit?usp=sharing'
+
+cv <- list()
+
+cv$entries_data <- googlesheets4::read_sheet(data_location, sheet = "entries", skip = 1, col_types = "c")
+cv$skills       <- googlesheets4::read_sheet(data_location, sheet = "language_skills", skip = 1, col_types = "c")
+cv$text_blocks  <- googlesheets4::read_sheet(data_location, sheet = "text_blocks", skip = 1, col_types = "c")
+cv$contact_info <- googlesheets4::read_sheet(data_location, sheet = "contact_info", skip = 1, col_types = "c")
+```
+
+Now I need to edit the content of these sections using the llm prompts and rebuild a sheet and upload it.
+
+```{r}
+cv$entries_data
+```
