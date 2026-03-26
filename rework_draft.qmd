@@ -8,10 +8,12 @@ library(jsonlite)
 library(dplyr)
 
 source('R/gpt_functions.R')
+
+#Rscript -e 'rmarkdown::render("cv.rmd", output_format = "pagedown::html_resume")'
 ```
 
 ```{r}
-api_key=''
+api_key <- Sys.getenv("OPENAI_API_KEY")
 ```
 
 ```{r}
@@ -53,6 +55,26 @@ cv_new$entries_data <- updated_entries
 cv_new$skills   <- cv$skills   
 cv_new$text_blocks  <- cv$text_blocks
 cv_new$contact_info <- cv$contact_info
+```
+
+```{r}
+library(writexl)
+library(googledrive)
+library(googlesheets4)
+
+# Build the list exactly how you want the tabs to appear
+cv_new <- list(
+  entries = updated_entries,
+  language_skills = cv$skills,
+  text_blocks = cv$text_blocks,
+  contact_info = cv$contact_info
+)
+
+# Save locally as Excel with tabs
+writexl::write_xlsx(
+  x = cv_new,
+  path = "output/cv_new_reworked.xlsx"
+)
 ```
 
 ```{r}

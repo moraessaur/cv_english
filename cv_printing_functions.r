@@ -14,9 +14,10 @@
 #' @param sheet_is_publicly_readable If you're using google sheets for data,
 #'   is the sheet publicly available? (Makes authorization easier.)
 #' @return A new `CV_Printer` object.
-create_CV_object <-  function(data_location,
-                              pdf_mode = FALSE,
-                              sheet_is_publicly_readable = TRUE) {
+create_CV_object <- function(data_location,
+                             pdf_mode = FALSE,
+                             sheet_is_publicly_readable = TRUE,
+                             skip_rows = 0) {
 
   cv <- list(
     pdf_mode = pdf_mode,
@@ -25,43 +26,40 @@ create_CV_object <-  function(data_location,
 
   is_google_sheets_location <- stringr::str_detect(data_location, "docs\\.google\\.com")
 
-  if(is_google_sheets_location){
-    if(sheet_is_publicly_readable){
-      # This tells google sheets to not try and authenticate. Note that this will only
-      # work if your sheet has sharing set to "anyone with link can view"
-      googlesheets4::gs4_deauth() # a função antiga aqui foi depreciada
+  if (is_google_sheets_location) {
+    if (sheet_is_publicly_readable) {
+      googlesheets4::gs4_deauth()
     } else {
-      # My info is in a public sheet so there's no need to do authentication but if you want
-      # to use a private sheet, then this is the way you need to do it.
-      # designate project-specific cache so we can render Rmd without problems
       options(gargle_oauth_cache = ".secrets")
     }
 
-    read_gsheet <- function(sheet_id){
-      googlesheets4::read_sheet(data_location, sheet = sheet_id, skip = 1, col_types = "c")
+    read_gsheet <- function(sheet_id) {
+      googlesheets4::read_sheet(
+        data_location,
+        sheet = sheet_id,
+        skip = skip_rows,
+        col_types = "c"
+      )
     }
-    cv$entries_data  <- read_gsheet(sheet_id = "entries")
-    cv$skills        <- read_gsheet(sheet_id = "language_skills")
-    cv$text_blocks   <- read_gsheet(sheet_id = "text_blocks")
-    cv$contact_info  <- read_gsheet(sheet_id = "contact_info")
-  } else {
-    # Want to go old-school with csvs?
-    cv$entries_data <- readr::read_csv(paste0(data_location, "entries.csv"), skip = 1)
-    cv$skills       <- readr::read_csv(paste0(data_location, "language_skills.csv"), skip = 1)
-    cv$text_blocks  <- readr::read_csv(paste0(data_location, "text_blocks.csv"), skip = 1)
-    cv$contact_info <- readr::read_csv(paste0(data_location, "contact_info.csv"), skip = 1)
-  }
 
+    cv$entries_data <- read_gsheet("entries")
+    cv$skills <- read_gsheet("language_skills")
+    cv$text_blocks <- read_gsheet("text_blocks")
+    cv$contact_info <- read_gsheet("contact_info")
+  } else {
+    cv$entries_data <- readr::read_csv(paste0(data_location, "entries.csv"), skip = skip_rows, show_col_types = FALSE)
+    cv$skills <- readr::read_csv(paste0(data_location, "language_skills.csv"), skip = skip_rows, show_col_types = FALSE)
+    cv$text_blocks <- readr::read_csv(paste0(data_location, "text_blocks.csv"), skip = skip_rows, show_col_types = FALSE)
+    cv$contact_info <- readr::read_csv(paste0(data_location, "contact_info.csv"), skip = skip_rows, show_col_types = FALSE)
+  }
 
   extract_year <- function(dates){
     date_year <- stringr::str_extract(dates, "(20|19)[0-9]{2}")
     date_year[is.na(date_year)] <- lubridate::year(lubridate::ymd(Sys.Date())) + 10
-
     date_year
   }
 
   parse_dates <- function(dates){
-
     date_month <- stringr::str_extract(dates, "(\\w+|\\d+)(?=(\\s|\\/|-)(20|19)[0-9]{2})")
     date_month[is.na(date_month)] <- "1"
 
@@ -69,15 +67,16 @@ create_CV_object <-  function(data_location,
       lubridate::dmy()
   }
 
-  # Clean up entries dataframe to format we need it for printing
   cv$entries_data %<>%
     tidyr::unite(
-      tidyr::starts_with('description'),
+      tidyr::starts_with("description"),
       col = "description_bullets",
       sep = "\n- ",
       na.rm = TRUE
     ) %>%
     dplyr::mutate(
+      start = as.character(start),
+      end = as.character(end),
       description_bullets = ifelse(description_bullets != "", paste0("- ", description_bullets), ""),
       start = ifelse(start == "NULL", NA, start),
       end = ifelse(end == "NULL", NA, end),
@@ -95,7 +94,7 @@ create_CV_object <-  function(data_location,
       )
     ) %>%
     dplyr::arrange(desc(parse_dates(end))) %>%
-    dplyr::mutate_all(~ ifelse(is.na(.), 'N/A', .))
+    dplyr::mutate(dplyr::across(dplyr::everything(), ~ ifelse(is.na(.), "N/A", .)))
 
   cv
 }

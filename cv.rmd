@@ -22,8 +22,9 @@ source("cv_printing_functions.r")
 
 # Read in all data and initialize a CV printer object
 CV <- create_CV_object(
-  data_location = "https://docs.google.com/spreadsheets/d/1wM_sW0Cg8elVDwWGzO55iz325chHJAY3_tw4HeswSRg/edit?usp=sharing",  
-  pdf_mode = params$pdf_mode
+  data_location = "https://docs.google.com/spreadsheets/d/1aX2H3IKl68wZU-ie6lygbyDfW5a8zZ7rEJ6I9FRJ1Lk/edit?usp=sharing",  
+  pdf_mode = params$pdf_mode,
+  skip_rows = 1
 )
 ```
 

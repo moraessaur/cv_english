@@ -1,0 +1,68 @@
+```{r}
+library(tidyverse)
+library(readxl)
+library(readr)
+library(gptr)
+library(httr2)
+library(jsonlite)
+library(dplyr)
+
+source('R/gpt_functions.R')
+source('R/mvp_functions.R')
+
+#Rscript -e 'rmarkdown::render("cv.rmd", output_format = "pagedown::html_resume")'
+```
+
+```{r}
+entries <- generate_cv_entries(
+  workbook_path = "data/cv_main.xlsx",
+  variant = "balanced"
+)
+```
+
+```{r}
+write_csv(entries,file='data/llm_test.csv')
+```
+
+
+It mostly worked, I only need to setup the correct header logic and add the remaining (unimportant) sheets to make the sheet the same format of the og cv. Would be helpful to send it directly to google drive as well.
+
+
+```{r}
+library(googledrive)
+drive_auth()
+
+folder <- drive_get("llm_dump")  # existing folder
+
+drive_upload(
+  media = "data/cv_main.xlsx",
+  path = folder,
+  name = "dead_test.xlsx"
+)
+```
+
+
+The code below allows to save the file to drive and already get a public url
+```{r}
+library(googledrive)
+
+drive_auth()
+
+folder <- drive_get("llm_dump")
+
+file <- drive_upload(
+  media = "data/cv_main.xlsx",
+  path = folder,
+  name = "dead_test2_public.xlsx"
+)
+
+# Make it public (anyone with link can view)
+drive_share(file, role = "reader", type = "anyone")
+
+# Get link
+file <- drive_get(as_id(file$id))  # refresh metadata
+
+link <- file$drive_resource[[1]]$webViewLink
+
+link
+```
