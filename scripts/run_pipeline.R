@@ -1,4 +1,3 @@
-```{r}
 library(tidyverse)
 library(readxl)
 library(readr)
@@ -12,19 +11,13 @@ source('R/gpt_functions.R')
 source('R/new_mvp_functions.R')
 source('R/render.R')
 
-#Rscript -e 'rmarkdown::render("cv.rmd", output_format = "pagedown::html_resume")'
-```
 
-```{r}
-# 2. Load the other sheets from your original file
 source_file <- "data/cv_new_reworked.xlsx"  # <- your existing file
 
 language_skills <- read_excel(source_file, sheet = "language_skills")
 text_blocks     <- read_excel(source_file, sheet = "text_blocks")
 contact_info    <- read_excel(source_file, sheet = "contact_info")
-```
 
-```{r}
 entries <- generate_cv_entries(
   workbook_path = "data/cv_main.xlsx",
   variant = "balanced",
@@ -34,14 +27,7 @@ entries <- generate_cv_entries(
 entries <- entries |> 
   mutate(loc=institution) |> 
   mutate(institution=NA)
-```
 
-```{r}
-entries
-```
-
-
-```{r}
 cv_render <- list(
   entries = entries,
   language_skills = language_skills,
@@ -51,11 +37,7 @@ cv_render <- list(
 
 # 4. Save to Excel
 write_xlsx(cv_render, "data/cv_render_new.xlsx")
-```
 
-
-The code below allows to save the file to drive and already get a public url
-```{r}
 library(googledrive)
 
 drive_auth()
@@ -77,26 +59,10 @@ file <- drive_get(as_id(file$id))  # refresh metadata
 
 link <- file$drive_resource[[1]]$webViewLink
 
-link
-```
 
-
-```{r}
-link
-```
-
-Everything working, just need to add the education and stack to the pipeline. Currently manually adding, it is needed otherwise the knit breaks.
-
-```{r}
 render_cv_from_sheet(
-  data_location = "https://docs.google.com/spreadsheets/d/15z7COj-Z4TDc6B4OeAID4vrMwEwLMZZhFmKyfGgrE18/edit?usp=drivesdk",
+  data_location = link,
   input_file = "cv.rmd",
-  output_file = "cv_au.html",
+  output_file = "cv_test.html",
   pdf_mode = TRUE
 )
-```
-
-
-```{r}
-# Rscript -e 'rmarkdown::render("cv.rmd", output_format = "pagedown::html_resume")'
-```
