@@ -12,8 +12,9 @@ source('R/new_mvp_functions.R')
 source('R/render.R')
 source('R/job_rec_descriptions_functions.R')
 
-#jd_text <- readr::read_file("job_descriptions/example_magazine_luiza.md")
+jd_text <- readr::read_file("job_descriptions/example_magazine_luiza.md")
 
+#just borrowing language, text blocks and contact from here
 source_file <- "data/cv_new_reworked.xlsx"  # <- your existing file
 
 language_skills <- read_excel(source_file, sheet = "language_skills")
@@ -27,7 +28,7 @@ entries <- generate_cv_entries(
   role_max_bullets = 3,
   academic_max_bullets = 3,
   selected_role_ids = c(4,3,2),
-  job_description = NULL,
+  job_description = jd_text,
   recruiter_message = NULL
 
 )

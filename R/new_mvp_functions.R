@@ -69,10 +69,170 @@ collapse_description_cols <- function(df_row) {
   paste(vals, collapse = "\n")
 }
 
+select_relevant_role_content <- function(
+  role,
+  role_detail_df,
+  role_achievements_df,
+  role_metrics_df,
+  tailoring_brief,
+  job_description = NULL,
+  recruiter_message = NULL,
+  model = "gpt-4.1-mini",
+  api_key = Sys.getenv("OPENAI_API_KEY")
+) {
+  collapse_to_text <- function(x) {
+    if (is.null(x)) return(NULL)
+    x <- as.character(x)
+    x <- x[!is.na(x)]
+    if (length(x) == 0) return(NULL)
+    paste(x, collapse = "\n")
+  }
+
+  strip_code_fences <- function(x) {
+    x <- trimws(x)
+    x <- sub("^```json\\s*", "", x, ignore.case = TRUE)
+    x <- sub("^```\\s*", "", x)
+    x <- sub("\\s*```$", "", x)
+    trimws(x)
+  }
+
+  job_description <- collapse_to_text(job_description)
+  recruiter_message <- collapse_to_text(recruiter_message)
+
+  role_detail_df <- role_detail_df %>%
+    mutate(
+      item_id = paste0("detail_", row_number()),
+      item_type = "detail",
+      text = as.character(raw_text)
+    ) %>%
+    select(item_id, item_type, text)
+
+  role_achievements_df <- role_achievements_df %>%
+    mutate(
+      item_id = paste0("achievement_", row_number()),
+      item_type = "achievement",
+      text = as.character(raw_text)
+    ) %>%
+    select(item_id, item_type, text)
+
+  role_metrics_df <- role_metrics_df %>%
+    mutate(
+      item_id = paste0("metric_", row_number()),
+      item_type = "metric",
+      text = dplyr::case_when(
+        "description" %in% names(role_metrics_df) ~ as.character(description),
+        TRUE ~ apply(role_metrics_df, 1, function(row) paste(row, collapse = " | "))
+      )
+    ) %>%
+    select(item_id, item_type, text)
+
+  candidates <- bind_rows(
+    role_detail_df,
+    role_achievements_df,
+    role_metrics_df
+  ) %>%
+    filter(!is.na(text), str_trim(text) != "")
+
+  if (nrow(candidates) == 0) {
+    return(list(
+      details = character(0),
+      achievements = character(0),
+      metrics = character(0),
+      raw_selection = NULL
+    ))
+  }
+
+  tailoring_text <- format_tailoring_brief(tailoring_brief, section = "roles")
+
+  candidates_text <- paste0(
+    apply(candidates, 1, function(row) {
+      paste0("[", row[["item_id"]], "] ",
+             "type=", row[["item_type"]], " | ",
+             row[["text"]])
+    }),
+    collapse = "\n"
+  )
+
+  prompt <- paste0(
+    "You are selecting the most relevant evidence for an English CV.\n\n",
+    "Choose which candidate items are most relevant for the target opportunity.\n",
+    "Prefer content that best supports the target role.\n",
+    "De-prioritize content that is true but less relevant.\n",
+    "For example, forecast accuracy metrics like MAPE may be low priority for some roles and high priority for others.\n\n",
+    "Return ONLY valid JSON. Do not use markdown fences.\n\n",
+    "Return an object with one key named 'items', containing an array of objects.\n",
+    "Each object must have:\n",
+    "- item_id\n",
+    "- relevance  (high | medium | low)\n",
+    "- reason\n\n",
+    tailoring_text, "\n",
+    "Role information:\n",
+    "Role ID: ", role$role_id, "\n",
+    "Title: ", role$title, "\n",
+    "Company: ", role$company, "\n\n",
+    "Job description:\n",
+    ifelse(is.null(job_description), "", job_description), "\n\n",
+    "Recruiter message:\n",
+    ifelse(is.null(recruiter_message), "", recruiter_message), "\n\n",
+    "Candidate items:\n",
+    candidates_text, "\n\n",
+    "Rules:\n",
+    "- Keep the output grounded in the provided content\n",
+    "- Do not invent facts\n",
+    "- Use 'high' for the strongest supporting evidence for this opportunity\n",
+    "- Use 'medium' for useful but secondary evidence\n",
+    "- Use 'low' for true but low-priority evidence\n"
+  )
+
+  raw <- call_openai_text(
+    prompt = prompt,
+    model = model,
+    api_key = api_key
+  )
+
+  raw_clean <- strip_code_fences(raw)
+
+  parsed <- tryCatch(
+    jsonlite::fromJSON(raw_clean, simplifyVector = TRUE),
+    error = function(e) NULL
+  )
+
+  if (is.null(parsed) || is.null(parsed$items)) {
+    return(list(
+      details = role_detail_df$text,
+      achievements = role_achievements_df$text,
+      metrics = role_metrics_df$text,
+      raw_selection = NULL
+    ))
+  }
+
+  selected <- as_tibble(parsed$items) %>%
+    mutate(
+      item_id = as.character(item_id),
+      relevance = as.character(relevance),
+      reason = as.character(reason)
+    )
+
+  candidates_scored <- candidates %>%
+    left_join(selected, by = "item_id") %>%
+    mutate(relevance = ifelse(is.na(relevance), "medium", relevance))
+
+  keep_df <- candidates_scored %>%
+    filter(relevance %in% c("high", "medium"))
+
+  list(
+    details = keep_df %>% filter(item_type == "detail") %>% pull(text),
+    achievements = keep_df %>% filter(item_type == "achievement") %>% pull(text),
+    metrics = keep_df %>% filter(item_type == "metric") %>% pull(text),
+    raw_selection = candidates_scored
+  )
+}
+
 generate_role_entries <- function(
   workbook_path,
   variant = "balanced",
   job_description = NULL,
+  recruiter_message = NULL,
   tailoring_brief = NULL,
   model = "gpt-4.1-mini",
   api_key = Sys.getenv("OPENAI_API_KEY"),
@@ -119,42 +279,55 @@ generate_role_entries <- function(
   for (i in seq_len(nrow(roles))) {
     role <- roles[i, ]
 
-    role_detail <- details %>%
-      filter(role_id == role$role_id) %>%
-      pull(raw_text)
-
-    role_detail <- if (length(role_detail) == 0) {
-      ""
-    } else {
-      paste(role_detail, collapse = "\n\n")
-    }
-
-    role_achievements <- achievements %>%
+    role_detail_df <- details %>%
       filter(role_id == role$role_id)
 
-    achievements_text <- if (nrow(role_achievements) > 0) {
-      paste0("- ", role_achievements$raw_text, collapse = "\n")
+    role_achievements_df <- achievements %>%
+      filter(role_id == role$role_id)
+
+    role_metrics_df <- metrics %>%
+      filter(role_id == role$role_id)
+
+    selected_content <- select_relevant_role_content(
+      role = role,
+      role_detail_df = role_detail_df,
+      role_achievements_df = role_achievements_df,
+      role_metrics_df = role_metrics_df,
+      tailoring_brief = tailoring_brief,
+      job_description = job_description,
+      recruiter_message = recruiter_message,
+      model = model,
+      api_key = api_key
+    )
+
+    role_detail <- if (length(selected_content$details) == 0) {
+      ""
+    } else {
+      paste(selected_content$details, collapse = "\n\n")
+    }
+
+    achievements_text <- if (length(selected_content$achievements) > 0) {
+      paste0("- ", selected_content$achievements, collapse = "\n")
     } else {
       "None provided."
     }
 
-    role_metrics <- metrics %>%
-      filter(role_id == role$role_id)
-
-    metrics_text <- if (nrow(role_metrics) > 0) {
-      if ("description" %in% names(role_metrics)) {
-        paste0("- ", role_metrics$description, collapse = "\n")
-      } else {
-        paste(capture.output(print(role_metrics)), collapse = "\n")
-      }
+    metrics_text <- if (length(selected_content$metrics) > 0) {
+      paste0("- ", selected_content$metrics, collapse = "\n")
     } else {
       "None provided."
     }
 
     role_location <- if ("location" %in% names(role)) as.character(role$location) else NA_character_
 
-    jd_text <- if (!is.null(job_description) && nzchar(job_description)) {
-      paste0("\n\nJob description:\n", job_description)
+    jd_text <- if (!is.null(job_description) && nzchar(paste(job_description, collapse = ""))) {
+      paste0("\n\nJob description:\n", paste(job_description, collapse = "\n"))
+    } else {
+      ""
+    }
+
+    recruiter_text <- if (!is.null(recruiter_message) && nzchar(paste(recruiter_message, collapse = ""))) {
+      paste0("\n\nRecruiter message:\n", paste(recruiter_message, collapse = "\n"))
     } else {
       ""
     }
@@ -173,19 +346,20 @@ generate_role_entries <- function(
       "Start: ", role$start, "\n",
       "End: ", role$end, "\n",
       "Location: ", role_location, "\n\n",
-      "Detailed role context:\n",
+      "Filtered role context:\n",
       role_detail, "\n\n",
-      "Achievements:\n",
+      "Filtered achievements:\n",
       achievements_text, "\n\n",
-      "Metrics:\n",
+      "Filtered metrics:\n",
       metrics_text,
       jd_text,
+      recruiter_text,
       "\n\n---\n\n",
       "Task:\n",
       "Write CV bullet points for this role.\n",
-      "Tailor the bullets to the provided tailoring brief and job description if available.\n",
+      "Tailor the bullets to the provided tailoring brief, job description, and recruiter message if available.\n",
       "Prioritize skills, tools, achievements, and outcomes that match the target opportunity.\n",
-      "Use only the information provided in the role context, achievements, metrics, and job description.\n",
+      "Use only the filtered information provided.\n",
       "Do NOT invent experience, metrics, scope, tools, responsibilities, or results.\n",
       "Return plain text only, one bullet per line."
     )
@@ -397,6 +571,7 @@ generate_cv_entries <- function(
     workbook_path = workbook_path,
     variant = role_variant,
     job_description = job_description,
+    recruiter_message = recruiter_message,
     tailoring_brief = tailoring_brief,
     model = model,
     api_key = api_key,
