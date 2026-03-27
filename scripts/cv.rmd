@@ -96,6 +96,7 @@ CV %<>% print_section('recent_professional_experience')
 <br>
 <br>
 
+
 Education {data-icon=graduation-cap data-concise=true}
 --------------------------------------------------------------------------------
 

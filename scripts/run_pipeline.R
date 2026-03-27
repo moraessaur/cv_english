@@ -16,6 +16,8 @@ source('R/job_rec_descriptions_functions.R')
 
 job_description_path <- "job_descriptions/biostatistician_roche.md"
 cv_id <- UUIDgenerate()
+optional_obs <- 'reducing_word_roles'
+
 
 if (!is.null(job_description_path)) {
   job_string <- str_extract(job_description_path, "[^/]+(?=\\.md$)")
@@ -85,6 +87,6 @@ link <- file$drive_resource[[1]]$webViewLink
 render_cv_from_sheet(
   data_location = link,
   input_file = "scripts/cv.rmd",
-  output_file = glue("../renders/cv_{job_string}_{cv_id}.html"),
+  output_file = glue("../renders/cv_{job_string}_{optional_obs}_{cv_id}.html"),
   pdf_mode = TRUE
 )
