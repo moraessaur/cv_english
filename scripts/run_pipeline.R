@@ -10,7 +10,9 @@ library(writexl)
 source('R/gpt_functions.R')
 source('R/new_mvp_functions.R')
 source('R/render.R')
+source('R/job_rec_descriptions_functions.R')
 
+jd_text <- readr::read_file("job_descriptions/example_magazine_luiza.md")
 
 source_file <- "data/cv_new_reworked.xlsx"  # <- your existing file
 
@@ -20,9 +22,16 @@ contact_info    <- read_excel(source_file, sheet = "contact_info")
 
 entries <- generate_cv_entries(
   workbook_path = "data/cv_main.xlsx",
-  variant = "brief",
-  selected_role_ids = c(4,3,2)
+  role_variant = "balanced",
+  academic_variant = "brief",
+  role_max_bullets = 4,
+  academic_max_bullets = 2,
+  selected_role_ids = c(4,3,2),
+  job_description = jd_text,
+  recruiter_message = NULL
+
 )
+
 
 entries <- entries |> 
   mutate(loc=institution) |> 
@@ -63,6 +72,6 @@ link <- file$drive_resource[[1]]$webViewLink
 render_cv_from_sheet(
   data_location = link,
   input_file = "scripts/cv.rmd",
-  output_file = "cv_test.html",
+  output_file = "../renders/cv_test.html",
   pdf_mode = TRUE
 )

@@ -1,7 +1,8 @@
-Balance technical execution and business impact.
+Write very short CV bullets.
 
-Keep it brief, give short descriptions, keep each description with a max of 10 words.
-
-Always include at least one quantifiable performance metric.
-
-Also shorten the academic articles section, 20 max words per bullet.
+Rules:
+- Maximum 10 words per bullet
+- Prefer 2 to 4 bullets
+- Keep only the most relevant points
+- Remove filler words
+- Keep wording ATS-friendly
