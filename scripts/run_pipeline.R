@@ -20,8 +20,8 @@ contact_info    <- read_excel(source_file, sheet = "contact_info")
 
 entries <- generate_cv_entries(
   workbook_path = "data/cv_main.xlsx",
-  variant = "balanced",
-  max_bullets = 3
+  variant = "brief",
+  selected_role_ids = c(4,3,2)
 )
 
 entries <- entries |> 
@@ -62,7 +62,7 @@ link <- file$drive_resource[[1]]$webViewLink
 
 render_cv_from_sheet(
   data_location = link,
-  input_file = "cv.rmd",
+  input_file = "scripts/cv.rmd",
   output_file = "cv_test.html",
   pdf_mode = TRUE
 )

@@ -20,6 +20,11 @@ knitr::opts_chunk$set(
 )
 
 library(magrittr) # For the pipe
+
+cat("CHUNK WD:", getwd(), "\n")
+cat("Exists R/...", file.exists("R/cv_printing_functions.r"), "\n")
+cat("Exists ../R/...", file.exists("../R/cv_printing_functions.r"), "\n")
+
 source("cv_printing_functions.r")
 
 # Read in all data and initialize a CV printer object

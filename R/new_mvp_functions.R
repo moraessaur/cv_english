@@ -66,17 +66,21 @@ generate_role_entries <- function(
   job_description = NULL,
   model = "gpt-4.1-mini",
   api_key = Sys.getenv("OPENAI_API_KEY"),
-  max_bullets = NULL
+  max_bullets = NULL,
+  selected_role_ids = NULL
 ) {
   roles <- read_excel(workbook_path, sheet = "roles")
   details <- read_excel(workbook_path, sheet = "experience_details")
   achievements <- read_excel(workbook_path, sheet = "achievements")
   metrics <- read_excel(workbook_path, sheet = "metrics")
 
+  if (!is.null(selected_role_ids)) {
+    roles <- roles %>% filter(role_id %in% selected_role_ids)
+  }
+
   base_prompt <- read_file("prompts/base/base_rules.md")
   variant_prompt <- read_file(file.path("prompts/base", paste0(variant, ".md")))
 
-  # Default behavior based on variant
   if (is.null(max_bullets)) {
     bullet_config <- list(
       concise = 2,
@@ -133,6 +137,7 @@ generate_role_entries <- function(
       variant_prompt,
       "\n\n---\n\n",
       "Role information:\n",
+      "Role ID: ", role$role_id, "\n",
       "Title: ", role$title, "\n",
       "Company: ", role$company, "\n",
       "Start: ", role$start, "\n",
@@ -159,11 +164,11 @@ generate_role_entries <- function(
 
     bullets <- split_bullets(model_output, max_bullets = max_bullets)
 
-    # Fill dynamically but keep fixed schema
     desc <- rep(NA_character_, 5)
     desc[1:length(bullets)] <- bullets
 
     out[[i]] <- tibble(
+      role_id = role$role_id,
       section = role$section,
       title = role$title,
       loc = role_location,
@@ -249,7 +254,8 @@ generate_cv_entries <- function(
   job_description = NULL,
   model = "gpt-4.1-mini",
   api_key = Sys.getenv("OPENAI_API_KEY"),
-  max_bullets = NULL
+  max_bullets = NULL,
+  selected_role_ids = NULL
 ) {
   roles_df <- generate_role_entries(
     workbook_path = workbook_path,
@@ -257,7 +263,8 @@ generate_cv_entries <- function(
     job_description = job_description,
     model = model,
     api_key = api_key,
-    max_bullets = max_bullets
+    max_bullets = max_bullets,
+    selected_role_ids = selected_role_ids
   )
 
   education_df <- generate_education_entries(workbook_path)
