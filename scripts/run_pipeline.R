@@ -6,13 +6,25 @@ library(httr2)
 library(jsonlite)
 library(dplyr)
 library(writexl)
+library(glue)
+library(uuid)
 
 source('R/gpt_functions.R')
 source('R/new_mvp_functions.R')
 source('R/render.R')
 source('R/job_rec_descriptions_functions.R')
 
-jd_text <- readr::read_file("job_descriptions/example_magazine_luiza.md")
+job_description_path <- "job_descriptions/biostatistician_roche.md"
+cv_id <- UUIDgenerate()
+
+if (!is.null(job_description_path)) {
+  job_string <- str_extract(job_description_path, "[^/]+(?=\\.md$)")
+} else {
+  job_string <- "cv_render"
+}
+
+
+jd_text <- readr::read_file(job_description_path)
 
 #just borrowing language, text blocks and contact from here
 source_file <- "data/cv_new_reworked.xlsx"  # <- your existing file
@@ -73,6 +85,6 @@ link <- file$drive_resource[[1]]$webViewLink
 render_cv_from_sheet(
   data_location = link,
   input_file = "scripts/cv.rmd",
-  output_file = "../renders/cv_business.html",
+  output_file = glue("../renders/cv_{job_string}_{cv_id}.html"),
   pdf_mode = TRUE
 )
