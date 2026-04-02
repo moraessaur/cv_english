@@ -432,7 +432,7 @@ generate_academic_entries <- function(
   academic <- read_excel(workbook_path, sheet = "academic_articles")
 
   base_prompt <- read_file("prompts/base/base_rules.md")
-  variant_prompt <- read_file(file.path("prompts/base", paste0(variant, ".md")))
+  variant_prompt <- read_file(file.path("prompts/stack_academic", paste0(variant, ".md")))
 
   if (is.null(tailoring_brief)) {
     tailoring_brief <- list(

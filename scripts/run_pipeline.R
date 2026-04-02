@@ -8,63 +8,73 @@ library(dplyr)
 library(writexl)
 library(glue)
 library(uuid)
+library(googledrive)
 
-source('R/gpt_functions.R')
-source('R/utils.R')
-source('R/new_mvp_functions.R')
-source('R/render.R')
-source('R/job_rec_descriptions_functions.R')
+source("R/gpt_functions.R")
+source("R/utils.R")
+source("R/new_mvp_functions.R")
+source("R/render.R")
+source("R/job_rec_descriptions_functions.R")
+source("R/pipeline_helpers.R")
 
-# main params
-job_description_path <- NULL
-cv_id <- UUIDgenerate()
-optional_obs <- 'mysterious_health_recruiter'
-prefix_master <- 'master'
-prefix_render_sheet <- 'rendered_sheet'
-prefix_render_cv_html <- 'rendered_html'
-prefix_render_cv_pdf<- 'rendered_pdf'
-stamp <- format(Sys.time(), "%Y%m%d_%H%M%S")
-recruiter_message_path <- "recruiter_messages/mysterious_health.md"
 
-if (!is.null(job_description_path)) {
-  job_string <- str_extract(job_description_path, "[^/]+(?=\\.md$)")
-  jd_text <- readr::read_file(job_description_path)
-} else {
-  job_string <- "cv_render"
-  jd_text <- NULL
-}
 
-if (!is.null(recruiter_message_path)) {
-  recruiter_message <- readr::read_file(recruiter_message_path)
-} else {
-  recruiter_message <- NULL
-}
+# =========================
+# CONFIG
+# =========================
 
-#jd_text <- readr::read_file(job_description_path)
-
-#just borrowing language, text blocks and contact from here
-source_file <- "data/cv_new_reworked.xlsx"  # <- your existing file
-
-language_skills <- read_excel(source_file, sheet = "language_skills")
-text_blocks     <- read_excel(source_file, sheet = "text_blocks")
-contact_info    <- read_excel(source_file, sheet = "contact_info")
-
-entries <- generate_cv_entries(
-  workbook_path = "data/cv_main.xlsx",
+cfg <- make_pipeline_config(
+  file_stem = "mysterious_health",
+  job_description_stem = "terra_magna_credit",
+  recruiter_message_stem = "mysterious_health_mlops",
+  optional_obs = "mysterious_health_recruiter",
   role_variant = "base_rules",
-  academic_variant = "results",
+  academic_variant = "mlops_heavy", # academic skills & tech stack
   role_max_bullets = 3,
   academic_max_bullets = 3,
-  selected_role_ids = c(4,3,2),
-  job_description = jd_text,
-  recruiter_message = recruiter_message
-
+  selected_role_ids = c(4, 3, 2),
+  source_file = "data/cv_new_reworked.xlsx",
+  workbook_path = "data/cv_main.xlsx",
+  render_xlsx_path = "data/cv_render_new.xlsx",
+  render_output_dir = "../renders",
+  drive_sheet_folder = "mimic_tear/renders/sheets",
+  input_file = "scripts/cv.rmd",
+  pdf_mode = TRUE
 )
 
 
-entries <- entries |> 
-  mutate(loc=institution) |> 
-  mutate(institution=NA)
+# =========================
+# LOAD STATIC SHEETS
+# =========================
+
+language_skills <- read_excel(cfg$source_file, sheet = "language_skills")
+text_blocks     <- read_excel(cfg$source_file, sheet = "text_blocks")
+contact_info    <- read_excel(cfg$source_file, sheet = "contact_info")
+
+
+# =========================
+# GENERATE ENTRIES
+# =========================
+
+entries <- generate_cv_entries(
+  workbook_path = cfg$workbook_path,
+  role_variant = cfg$role_variant,
+  academic_variant = cfg$academic_variant,
+  role_max_bullets = cfg$role_max_bullets,
+  academic_max_bullets = cfg$academic_max_bullets,
+  selected_role_ids = cfg$selected_role_ids,
+  job_description = cfg$job_description,
+  recruiter_message = cfg$recruiter_message
+)
+
+entries <- entries |>
+  mutate(loc = institution) |>
+  mutate(institution = NA)
+
+
+# =========================
+# BUILD RENDER WORKBOOK
+# =========================
 
 cv_render <- list(
   entries = entries,
@@ -73,35 +83,40 @@ cv_render <- list(
   contact_info = contact_info
 )
 
-# 4. Save to Excel
-write_xlsx(cv_render, "data/cv_render_new.xlsx")
+write_xlsx(cv_render, cfg$render_xlsx_path)
 
-library(googledrive)
+
+# =========================
+# UPLOAD RENDER SHEET TO DRIVE
+# =========================
 
 drive_auth()
 
-#folder <- drive_get("llm_dump")
-
 file <- drive_upload(
-  media = "data/cv_render_new.xlsx",
-  path = 'mimic_tear/renders/sheets',
-  name = glue("{job_string}_{optional_obs}_{cv_id}_{stamp}.xlsx"),
-  type = 'spreadsheet'
+  media = cfg$render_xlsx_path,
+  path = cfg$drive_sheet_folder,
+  name = cfg$render_sheet_name,
+  type = "spreadsheet"
 )
 
-# Make it public (anyone with link can view)
 drive_share(file, role = "reader", type = "anyone")
 
-# Get link
-file <- drive_get(as_id(file$id))  # refresh metadata
-
+file <- drive_get(as_id(file$id))
 link <- file$drive_resource[[1]]$webViewLink
 
 
+# =========================
+# RENDER HTML CV
+# =========================
+
 render_cv_from_sheet(
   data_location = link,
-  input_file = "scripts/cv.rmd",
-  output_file = glue("../renders/{job_string}_{optional_obs}_{cv_id}_{stamp}.html"),
-  pdf_mode = TRUE
+  input_file = cfg$input_file,
+  output_file = cfg$html_out,
+  pdf_mode = cfg$pdf_mode
 )
 
+cat("Rendered HTML:", cfg$html_out, "\n")
+cat("Planned PDF path:", cfg$pdf_out, "\n")
+cat("Job description path:", cfg$job_description_path %||% "NULL", "\n")
+cat("Recruiter message path:", cfg$recruiter_message_path %||% "NULL", "\n")
