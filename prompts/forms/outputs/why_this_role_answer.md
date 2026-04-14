@@ -1,0 +1,7 @@
+My leadership experience primarily involves guiding cross-functional teams and collaborating closely with stakeholders to deliver impactful data science projects. At Ria Money Transfer, I led the end-to-end development and deployment of a forecasting pipeline that replaced a manual process, directly working with the CFO and other stakeholders to secure project approval and provide regular updates. I structured the codebase for scalability, established a CI/CD process in collaboration with DevOps, and advised both data scientists and engineers to align efforts and ensure smooth deployment and operational excellence.
+
+At Melhor Envio, I took initiative by proposing and designing new client-specific churn metrics and leading the development of a real-time data pipeline, which became a critical business tool used by the board of directors. I also guided the marketing team in implementing customer segmentation models, enabling more targeted business actions.
+
+In my role at PicPay, I bridged gaps between teams by combining statistical rigor with software engineering practices, leading analysts in adopting PySpark for regulatory reporting pipelines, and driving experiments that improved the user experience through data-driven segmentation and A/B testing.
+
+In all these roles, leadership meant not only managing projects but also mentoring colleagues, communicating complex analyses clearly, and fostering collaboration among diverse teams to achieve shared goals effectively.
