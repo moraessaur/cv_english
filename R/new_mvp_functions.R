@@ -374,14 +374,9 @@ generate_role_entries <- function(
   for (i in seq_len(nrow(roles))) {
     role <- roles[i, ]
 
-    role_detail_df <- details %>%
-      filter(role_id == role$role_id)
-
-    role_achievements_df <- achievements %>%
-      filter(role_id == role$role_id)
-
-    role_metrics_df <- metrics %>%
-      filter(role_id == role$role_id)
+    role_detail_df <- details %>% filter(role_id == role$role_id)
+    role_achievements_df <- achievements %>% filter(role_id == role$role_id)
+    role_metrics_df <- metrics %>% filter(role_id == role$role_id)
 
     selected_content <- select_relevant_role_content(
       role = role,
@@ -411,8 +406,34 @@ generate_role_entries <- function(
       "None provided."
     }
 
-    metrics_text <- if (length(selected_content$metrics) > 0) {
-      paste0("- ", selected_content$metrics, collapse = "\n")
+    # Use raw role_metrics_df so value + description always reach the prompt
+    metrics_text <- if (nrow(role_metrics_df) > 0) {
+      paste0(
+        "- ", role_metrics_df$type, ": ",
+        role_metrics_df$value,
+        " (", role_metrics_df$description, ")",
+        collapse = "\n"
+      )
+    } else {
+      "None provided."
+    }
+
+    priority_metrics_df <- role_metrics_df
+
+    if ("priority" %in% names(priority_metrics_df)) {
+      priority_metrics_df <- priority_metrics_df %>%
+        filter(tolower(as.character(priority)) == "high")
+    } else {
+      priority_metrics_df <- priority_metrics_df[0, ]
+    }
+
+    priority_metrics_text <- if (nrow(priority_metrics_df) > 0) {
+      paste0(
+        "- ", priority_metrics_df$type, ": ",
+        priority_metrics_df$value,
+        " (", priority_metrics_df$description, ")",
+        collapse = "\n"
+      )
     } else {
       "None provided."
     }
@@ -445,24 +466,40 @@ generate_role_entries <- function(
       "Start: ", role$start, "\n",
       "End: ", role$end, "\n",
       "Location: ", role_location, "\n\n",
-      "Filtered role context:\n",
-      role_detail, "\n\n",
+
+      "MANDATORY ROLE-SPECIFIC METRICS — THESE EXACT VALUES MUST APPEAR NATURALLY IN THE BULLETS:\n",
+      priority_metrics_text, "\n\n",
+
+      "ALL AVAILABLE ROLE METRICS:\n",
+      metrics_text, "\n\n",
+
       "Filtered achievements:\n",
       achievements_text, "\n\n",
-      "Filtered metrics:\n",
-      metrics_text,
+
+      "Filtered role context:\n",
+      role_detail,
       jd_text,
       recruiter_text,
+
       "\n\n---\n\n",
       "Task:\n",
       "Write CV bullet points for this role.\n",
       "Tailor the bullets to the provided tailoring brief, job description, and recruiter message if available.\n",
-      "Prioritize skills, tools, achievements, and outcomes that match the target opportunity.\n",
-      "Use only the filtered information provided.\n",
-      "If strong metrics or quantified business-impact evidence are available, include at least one in the output.\n",
-      "Do not let descriptive context crowd out measurable results.\n",
-      "Do NOT invent experience, metrics, scope, tools, responsibilities, or results.\n",
-      "Return plain text only, one bullet per line."
+      "Prioritize skills, tools, achievements, metrics, and outcomes that match the target opportunity.\n",
+      "Use only the information provided.\n\n",
+
+      "Metric rules:\n",
+      "- If mandatory role-specific metrics are provided, at least one bullet MUST include an exact metric value.\n",
+      "- Use the exact metric values naturally, without sounding forced.\n",
+      "- Do not replace numeric metrics with vague phrases like 'improved', 'optimized', or 'enhanced'.\n",
+      "- Do not transfer metrics or terms from one role to another.\n",
+      "- Prefer savings, accuracy, efficiency, or speed metrics when space is limited.\n\n",
+
+      "Style rules:\n",
+      "- Keep bullets concise and professional.\n",
+      "- Around 20 words per bullet.\n",
+      "- Do NOT invent experience, metrics, scope, tools, responsibilities, or results.\n",
+      "- Return plain text only, one bullet per line."
     )
 
     model_output <- call_openai_text(
