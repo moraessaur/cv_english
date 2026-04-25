@@ -1,10 +1,10 @@
 library(googledrive)
 library(tidyverse)
 library(readxl)
-
-library(googledrive)
+library(glue)
+library(uuid)
+library(tools)
 library(googlesheets4)
-library(readxl)
 library(purrr)
 
 save_spreadsheet <- function(x, folder, prefix = "master") {
@@ -223,4 +223,66 @@ convert_html_to_pdf_and_upload <- function(
   }
 
   invisible(results)
+}
+
+
+upload_markdown_to_drive <- function(
+  input_path,
+  drive_folder,
+  add_uuid = TRUE,
+  add_timestamp = TRUE,
+  overwrite = FALSE,
+  drive_share_public = FALSE
+) {
+  drive_auth()
+
+  if (!file.exists(input_path)) {
+    stop("File does not exist: ", input_path)
+  }
+
+  if (!grepl("\\.md$", input_path, ignore.case = TRUE)) {
+    stop("`input_path` must point to a .md file.")
+  }
+
+  folder_dribble <- if (inherits(drive_folder, "dribble")) {
+    drive_folder
+  } else {
+    drive_get(drive_folder)
+  }
+
+  if (nrow(folder_dribble) != 1) {
+    stop("Could not uniquely identify target Google Drive folder.")
+  }
+
+  base <- tools::file_path_sans_ext(basename(input_path))
+  ext <- tools::file_ext(input_path)
+
+  extra_parts <- c(
+    if (add_uuid) uuid::UUIDgenerate() else NULL,
+    if (add_timestamp) format(Sys.time(), "%Y%m%d_%H%M%S") else NULL
+  )
+  extra_parts <- extra_parts[!is.na(extra_parts) & nzchar(extra_parts)]
+
+  drive_name <- if (length(extra_parts) > 0) {
+    glue::glue("{base}_{paste(extra_parts, collapse = '_')}.{ext}")
+  } else {
+    glue::glue("{base}.{ext}")
+  }
+
+  drive_file <- drive_upload(
+    media = input_path,
+    path = folder_dribble,
+    name = drive_name,
+    overwrite = overwrite
+  )
+
+  if (drive_share_public) {
+    drive_share(drive_file, role = "reader", type = "anyone")
+  }
+
+  list(
+    local_path = input_path,
+    drive_file = drive_file,
+    drive_name = drive_name
+  )
 }

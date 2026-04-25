@@ -78,7 +78,11 @@ select_relevant_role_content <- function(
   job_description = NULL,
   recruiter_message = NULL,
   model = "gpt-4.1-mini",
-  api_key = Sys.getenv("OPENAI_API_KEY")
+  api_key = Sys.getenv("OPENAI_API_KEY"),
+  min_metrics_per_role = 1,
+  max_details_keep = 2,
+  max_achievements_keep = 2,
+  max_metrics_keep = 2
 ) {
   collapse_to_text <- function(x) {
     if (is.null(x)) return(NULL)
@@ -96,6 +100,12 @@ select_relevant_role_content <- function(
     trimws(x)
   }
 
+  to_logical_flag <- function(x) {
+    if (is.null(x)) return(rep(FALSE, 0))
+    x_chr <- tolower(trimws(as.character(x)))
+    x_chr %in% c("true", "t", "1", "yes", "y")
+  }
+
   job_description <- collapse_to_text(job_description)
   recruiter_message <- collapse_to_text(recruiter_message)
 
@@ -103,28 +113,35 @@ select_relevant_role_content <- function(
     mutate(
       item_id = paste0("detail_", row_number()),
       item_type = "detail",
-      text = as.character(raw_text)
+      text = as.character(raw_text),
+      must_use = FALSE,
+      priority = NA_character_
     ) %>%
-    select(item_id, item_type, text)
+    select(item_id, item_type, text, must_use, priority)
 
   role_achievements_df <- role_achievements_df %>%
     mutate(
       item_id = paste0("achievement_", row_number()),
       item_type = "achievement",
-      text = as.character(raw_text)
+      text = as.character(raw_text),
+      must_use = if ("must_use" %in% names(.)) to_logical_flag(must_use) else FALSE,
+      priority = if ("priority" %in% names(.)) as.character(priority) else NA_character_
     ) %>%
-    select(item_id, item_type, text)
+    select(item_id, item_type, text, must_use, priority)
 
   role_metrics_df <- role_metrics_df %>%
     mutate(
       item_id = paste0("metric_", row_number()),
       item_type = "metric",
       text = dplyr::case_when(
-        "description" %in% names(role_metrics_df) ~ as.character(description),
-        TRUE ~ apply(role_metrics_df, 1, function(row) paste(row, collapse = " | "))
-      )
+        "description" %in% names(.) & !is.na(description) & trimws(as.character(description)) != "" ~ as.character(description),
+        "value" %in% names(.) & !is.na(value) & trimws(as.character(value)) != "" ~ as.character(value),
+        TRUE ~ apply(., 1, function(row) paste(row, collapse = " | "))
+      ),
+      must_use = if ("must_use" %in% names(.)) to_logical_flag(must_use) else FALSE,
+      priority = if ("priority" %in% names(.)) as.character(priority) else NA_character_
     ) %>%
-    select(item_id, item_type, text)
+    select(item_id, item_type, text, must_use, priority)
 
   candidates <- bind_rows(
     role_detail_df,
@@ -146,9 +163,14 @@ select_relevant_role_content <- function(
 
   candidates_text <- paste0(
     apply(candidates, 1, function(row) {
-      paste0("[", row[["item_id"]], "] ",
-             "type=", row[["item_type"]], " | ",
-             row[["text"]])
+      paste0(
+        "[", row[["item_id"]], "] ",
+        "type=", row[["item_type"]],
+        if (!is.na(row[["priority"]])) paste0(" | priority=", row[["priority"]]) else "",
+        if (isTRUE(as.logical(row[["must_use"]]))) " | must_use=TRUE" else "",
+        " | ",
+        row[["text"]]
+      )
     }),
     collapse = "\n"
   )
@@ -158,7 +180,10 @@ select_relevant_role_content <- function(
     "Choose which candidate items are most relevant for the target opportunity.\n",
     "Prefer content that best supports the target role.\n",
     "De-prioritize content that is true but less relevant.\n",
-    "For example, forecast accuracy metrics like MAPE may be low priority for some roles and high priority for others.\n\n",
+    "Quantified results and business-impact metrics are often stronger CV evidence than long descriptive context.\n",
+    "Do not let long narrative details crowd out strong metrics or achievements.\n",
+    "Forecast accuracy metrics like MAPE may be high priority for forecasting roles and low priority for other roles.\n",
+    "Speed, efficiency, automation, and cost-savings metrics may be especially important for MLOps/platform or business-impact roles.\n\n",
     "Return ONLY valid JSON. Do not use markdown fences.\n\n",
     "Return an object with one key named 'items', containing an array of objects.\n",
     "Each object must have:\n",
@@ -181,7 +206,8 @@ select_relevant_role_content <- function(
     "- Do not invent facts\n",
     "- Use 'high' for the strongest supporting evidence for this opportunity\n",
     "- Use 'medium' for useful but secondary evidence\n",
-    "- Use 'low' for true but low-priority evidence\n"
+    "- Use 'low' for true but low-priority evidence\n",
+    "- If an item is marked must_use=TRUE, it should almost always be high unless clearly irrelevant\n"
   )
 
   raw <- call_openai_text(
@@ -198,27 +224,92 @@ select_relevant_role_content <- function(
   )
 
   if (is.null(parsed) || is.null(parsed$items)) {
-    return(list(
-      details = role_detail_df$text,
-      achievements = role_achievements_df$text,
-      metrics = role_metrics_df$text,
-      raw_selection = NULL
-    ))
+    candidates_scored <- candidates %>%
+      mutate(relevance = "medium", reason = NA_character_)
+  } else {
+    selected <- as_tibble(parsed$items) %>%
+      mutate(
+        item_id = as.character(item_id),
+        relevance = as.character(relevance),
+        reason = as.character(reason)
+      )
+
+    candidates_scored <- candidates %>%
+      left_join(selected, by = "item_id") %>%
+      mutate(relevance = ifelse(is.na(relevance), "medium", relevance))
   }
 
-  selected <- as_tibble(parsed$items) %>%
+  candidates_scored <- candidates_scored %>%
     mutate(
-      item_id = as.character(item_id),
-      relevance = as.character(relevance),
-      reason = as.character(reason)
+      must_use = ifelse(is.na(must_use), FALSE, must_use),
+      priority_rank = case_when(
+        tolower(priority) == "high" ~ 1L,
+        tolower(priority) == "medium" ~ 2L,
+        tolower(priority) == "low" ~ 3L,
+        TRUE ~ 4L
+      ),
+      type_rank = case_when(
+        item_type == "metric" ~ 1L,
+        item_type == "achievement" ~ 2L,
+        item_type == "detail" ~ 3L,
+        TRUE ~ 4L
+      ),
+      relevance_rank = case_when(
+        relevance == "high" ~ 1L,
+        relevance == "medium" ~ 2L,
+        relevance == "low" ~ 3L,
+        TRUE ~ 4L
+      )
     )
 
-  candidates_scored <- candidates %>%
-    left_join(selected, by = "item_id") %>%
-    mutate(relevance = ifelse(is.na(relevance), "medium", relevance))
+  forced_keep_df <- candidates_scored %>%
+    filter(must_use %in% TRUE)
 
-  keep_df <- candidates_scored %>%
-    filter(relevance %in% c("high", "medium"))
+  high_df <- candidates_scored %>%
+    filter(relevance == "high")
+
+  medium_df <- candidates_scored %>%
+    filter(relevance == "medium") %>%
+    arrange(type_rank, priority_rank)
+
+  medium_metrics_df <- medium_df %>%
+    filter(item_type == "metric") %>%
+    slice_head(n = max_metrics_keep)
+
+  medium_achievements_df <- medium_df %>%
+    filter(item_type == "achievement") %>%
+    slice_head(n = max_achievements_keep)
+
+  medium_details_df <- medium_df %>%
+    filter(item_type == "detail") %>%
+    slice_head(n = max_details_keep)
+
+  keep_df <- bind_rows(
+    forced_keep_df,
+    high_df,
+    medium_metrics_df,
+    medium_achievements_df,
+    medium_details_df
+  ) %>%
+    distinct(item_id, .keep_all = TRUE)
+
+  current_metric_n <- sum(keep_df$item_type == "metric")
+
+  if (min_metrics_per_role > 0 && current_metric_n < min_metrics_per_role) {
+    needed <- min_metrics_per_role - current_metric_n
+
+    extra_metrics_df <- candidates_scored %>%
+      filter(item_type == "metric") %>%
+      anti_join(keep_df %>% select(item_id), by = "item_id") %>%
+      arrange(relevance_rank, priority_rank) %>%
+      slice_head(n = needed)
+
+    keep_df <- bind_rows(keep_df, extra_metrics_df) %>%
+      distinct(item_id, .keep_all = TRUE)
+  }
+
+  keep_df <- keep_df %>%
+    arrange(type_rank, priority_rank, relevance_rank)
 
   list(
     details = keep_df %>% filter(item_type == "detail") %>% pull(text),
@@ -237,7 +328,11 @@ generate_role_entries <- function(
   model = "gpt-4.1-mini",
   api_key = Sys.getenv("OPENAI_API_KEY"),
   max_bullets = NULL,
-  selected_role_ids = NULL
+  selected_role_ids = NULL,
+  min_metrics_per_role = 1,
+  max_details_keep = 2,
+  max_achievements_keep = 2,
+  max_metrics_keep = 2
 ) {
   roles <- read_excel(workbook_path, sheet = "roles")
   details <- read_excel(workbook_path, sheet = "experience_details")
@@ -297,7 +392,11 @@ generate_role_entries <- function(
       job_description = job_description,
       recruiter_message = recruiter_message,
       model = model,
-      api_key = api_key
+      api_key = api_key,
+      min_metrics_per_role = min_metrics_per_role,
+      max_details_keep = max_details_keep,
+      max_achievements_keep = max_achievements_keep,
+      max_metrics_keep = max_metrics_keep
     )
 
     role_detail <- if (length(selected_content$details) == 0) {
@@ -360,6 +459,8 @@ generate_role_entries <- function(
       "Tailor the bullets to the provided tailoring brief, job description, and recruiter message if available.\n",
       "Prioritize skills, tools, achievements, and outcomes that match the target opportunity.\n",
       "Use only the filtered information provided.\n",
+      "If strong metrics or quantified business-impact evidence are available, include at least one in the output.\n",
+      "Do not let descriptive context crowd out measurable results.\n",
       "Do NOT invent experience, metrics, scope, tools, responsibilities, or results.\n",
       "Return plain text only, one bullet per line."
     )
@@ -558,7 +659,11 @@ generate_cv_entries <- function(
   api_key = Sys.getenv("OPENAI_API_KEY"),
   role_max_bullets = 4,
   academic_max_bullets = 2,
-  selected_role_ids = NULL
+  selected_role_ids = NULL,
+  min_metrics_per_role = 1,
+  max_details_keep = 2,
+  max_achievements_keep = 2,
+  max_metrics_keep = 2
 ) {
   tailoring_brief <- generate_tailoring_brief(
     job_description = job_description,
@@ -576,7 +681,11 @@ generate_cv_entries <- function(
     model = model,
     api_key = api_key,
     max_bullets = role_max_bullets,
-    selected_role_ids = selected_role_ids
+    selected_role_ids = selected_role_ids,
+    min_metrics_per_role = min_metrics_per_role,
+    max_details_keep = max_details_keep,
+    max_achievements_keep = max_achievements_keep,
+    max_metrics_keep = max_metrics_keep
   )
 
   education_df <- generate_education_entries(workbook_path)

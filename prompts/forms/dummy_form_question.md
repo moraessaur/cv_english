@@ -1,1 +1,1 @@
-What is your experience with leadership?
+What is your experience with data science applied to finance?

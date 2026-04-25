@@ -10,6 +10,8 @@ Rules:
 - Avoid sounding generic or exaggerated
 - Return markdown only
 - Do not include a title unless the question asks for one
+- select only relevant companies
+
 
 Candidate experience:
 {{experience_text}}

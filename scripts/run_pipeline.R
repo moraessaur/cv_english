@@ -24,11 +24,11 @@ source("R/pipeline_helpers.R")
 # =========================
 
 cfg <- make_pipeline_config(
-  file_stem = "mysterious_health",
-  job_description_stem = "terra_magna_credit",
-  recruiter_message_stem = "mysterious_health_mlops",
-  optional_obs = "mysterious_health_recruiter",
-  role_variant = "base_rules",
+  file_stem = "nestle",
+  job_description_stem = "nestle",
+  recruiter_message_stem =  NULL,
+  optional_obs = NULL,
+  role_variant = "retail",
   academic_variant = "mlops_heavy", # academic skills & tech stack
   role_max_bullets = 3,
   academic_max_bullets = 3,
