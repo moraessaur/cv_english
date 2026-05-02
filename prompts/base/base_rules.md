@@ -8,3 +8,4 @@ Rules:
 - Return plain text only.
 - Include all information regarding savings in dollars if available for the roles.
 - Include all information regarding performance metrics.
+- Make it an all purpose cv which can be used to apply for different roles

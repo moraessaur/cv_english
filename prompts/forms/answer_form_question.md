@@ -11,6 +11,7 @@ Rules:
 - Return markdown only
 - Do not include a title unless the question asks for one
 - select only relevant companies
+- Always use objective metrics when available (mape, conversion, percentages, savings, etc...)
 
 
 Candidate experience:

@@ -1,0 +1,7 @@
+At Carrefour, I led the development of an end-to-end forecasting solution to predict sales for promotional events of fast-moving consumer goods up to 21 days in advance. I first designed and implemented a clean, orchestrated ETL pipeline to consolidate product sales data and make it accessible to the supply team. Using this data, I developed machine learning models based on LightGBM with rigorous experimental design to produce reliable forecasts.
+
+Working closely with the ML Operations team, I helped deploy a parallelized pipeline on Vertex AI and Kubeflow Pipelines, optimizing code by transitioning from pandas to polars and applying modularization and vectorization techniques. This optimization reduced processing time from 6 hours to 40 minutes, enabling daily training and forecasting at the store level.
+
+I designed the experimental framework to evaluate model effectiveness via hypothesis testing, comparing forecast accuracy against baseline stock levels in control stores. I established a performance database tracking model accuracy and bugs, primarily using MAPE and weighted MAPE metrics with statistical adjustments to account for outliers.
+
+Additionally, I collaborated with stakeholders and senior management to improve data literacy and communicate results with statistical rigor, clarifying challenges such as outliers and forecast error interpretation. I also developed product-specific models that outperformed single-store models, which led to the company commissioning a similar model for regular sales forecasting.
