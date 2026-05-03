@@ -1,4 +1,25 @@
-.Rproj.user
+# secrets
+.secrets/
+.env
+.Renviron
+*.key
+
+# R / Quarto
 .Rhistory
 .RData
-.Ruserdata
+.Rproj.user/
+*_cache/
+*_files/
+
+# outputs
+output/
+!output/.gitkeep
+
+# OS / editor
+.DS_Store
+.vscode/
+
+*.html
+*.csv
+*.xlsx
+*.pdf

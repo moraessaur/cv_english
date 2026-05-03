@@ -5,6 +5,8 @@ date: "`r Sys.Date()`"
 params:
   pdf_mode:
     value: true
+  data_location:
+    value: ""
 output:
   pagedown::html_resume:
     css: ['dd_cv.css', 'resume']
@@ -18,12 +20,18 @@ knitr::opts_chunk$set(
 )
 
 library(magrittr) # For the pipe
+
+cat("CHUNK WD:", getwd(), "\n")
+cat("Exists R/...", file.exists("R/cv_printing_functions.r"), "\n")
+cat("Exists ../R/...", file.exists("../R/cv_printing_functions.r"), "\n")
+
 source("cv_printing_functions.r")
 
 # Read in all data and initialize a CV printer object
 CV <- create_CV_object(
-  data_location = "https://docs.google.com/spreadsheets/d/1B8NXAFrgz7v-q_vj5DnF4pLeljqBjw21Cowe9XFKBp4/edit?usp=sharing",  
-  pdf_mode = params$pdf_mode
+  data_location = params$data_location,
+  pdf_mode = params$pdf_mode,
+  skip_rows = 0
 )
 ```
 
@@ -56,11 +64,11 @@ CV %<>% print_text_block("intro")
 
 <br>
 
-Recent professional experience {data-icon=suitcase}
+Relevant professional experience {data-icon=suitcase}
 --------------------------------------------------------------------------------
 
 ::: aside
-**Contact & Portfolio**
+**Contact**
 
 <i class="fa fa-home"></i> [lucasmoraes.io](https://lucasmoraes.io)
 
@@ -68,9 +76,7 @@ Recent professional experience {data-icon=suitcase}
 
 <i class="fa fa-github"></i> [GitHub: `@`moraessaur](https://github.com/moraessaur)
 
-<i class="fab fa-linkedin-in"></i> [LinkedIn](https://www.linkedin.com/in/lucas-moraes-78944a32/)
-
-[**Download this CV**](https://raw.githubusercontent.com/moraessaur/cv_english/main/cv_lucas_moraes_en.pdf)
+<i class="fab fa-linkedin-in"></i> [LinkedIn](https://www.linkedin.com/in/lucas-moraes-msc-78944a32/)
 
 :::
 
@@ -90,6 +96,7 @@ CV %<>% print_section('recent_professional_experience')
 <br>
 <br>
 
+
 Education {data-icon=graduation-cap data-concise=true}
 --------------------------------------------------------------------------------
 
@@ -100,8 +107,10 @@ CV %<>% print_text_block('recent_professional_experience_aside')
 ```
 
 
-**Technical knowledge**
+**Technical stack**
 **__________________**
+
+<i class="fa-solid fa-code-merge"></i> **Git**
 
 <i class="fab fa-r-project"></i> **R**
 
@@ -109,9 +118,9 @@ CV %<>% print_text_block('recent_professional_experience_aside')
 
 <i class="fa fa-database"></i> **SQL**
 
-**Spark**
+<i class="fa-solid fa-star"></i> **Spark**
 
-**Looker**
+<i class="fa-solid fa-circle-nodes"></i> **Data Bricks**
 
 <i class="fas fa-chart-bar"></i> **Statistics**
 
@@ -121,7 +130,6 @@ CV %<>% print_text_block('recent_professional_experience_aside')
 
 <i class="fas fa-award"></i> **Fluent english**
 
-<i class="fas fa-users"></i> **Soft Skills**
 :::
 
 

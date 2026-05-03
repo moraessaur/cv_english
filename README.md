@@ -1,8 +1,10 @@
-# cv_datadriven
+# cv_english
 
-Currículo gerado em formatos diversos (html, pdf) com informações extraídas do google sheets.
+Project for generating and editing CV content with R / Quarto.
 
-Uso esse repo para atualizar meu cv usando {Rmarkdown} e deixá-lo pronto para incluir em meu site ou enviar para alguém.
-
-Segui os passos [desse post do Nick Strayer](https://medium.com/@darwin.cubi/how-to-create-a-cv-with-rmarkdown-awesome-cv-and-google-sheets-7e9a05815f63) e adaptei/atualizei algumas coisas à minha necessidade.
-
+## Structure
+- data/: source spreadsheets
+- output/: rendered outputs
+- scripts/: helper scripts
+- R/: utility functions
+- rework_draft.qmd: main notebook / draft
