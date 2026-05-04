@@ -30,8 +30,8 @@ cfg <- make_pipeline_config(
   optional_obs = NULL,
   role_variant = "retail",
   academic_variant = "mlops_heavy", # academic skills & tech stack
-  role_max_bullets = 4,
-  academic_max_bullets = 3,
+  role_max_bullets = 2,
+  academic_max_bullets = 1,
   selected_role_ids = c(4, 3, 2),
   source_file = "data/cv_new_reworked.xlsx",
   workbook_path = "data/cv_main.xlsx",
@@ -62,6 +62,8 @@ entries <- generate_cv_entries(
   academic_variant = cfg$academic_variant,
   role_max_bullets = cfg$role_max_bullets,
   academic_max_bullets = cfg$academic_max_bullets,
+  stack_max_bullets = cfg$stack_max_bullets,
+  stack_max_desc_per_category = cfg$stack_max_desc_per_category,
   selected_role_ids = cfg$selected_role_ids,
   job_description = cfg$job_description,
   recruiter_message = cfg$recruiter_message

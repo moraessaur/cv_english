@@ -1,5 +1,5 @@
 Rewrite CV content clearly and truthfully.
-around 20 words per bullet
+around 15 words per bullet
 
 Rules:
 - Do not invent experience, tools, or metrics.

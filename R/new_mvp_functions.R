@@ -69,6 +69,54 @@ collapse_description_cols <- function(df_row) {
   paste(vals, collapse = "\n")
 }
 
+generate_stack_entries <- function(
+  workbook_path,
+  max_bullets = 5,
+  max_desc_per_category = 3
+) {
+  stack <- read_excel(workbook_path, sheet = "skills_stack")
+
+  stack_grouped <- stack %>%
+    filter(
+      !is.na(Category),
+      !is.na(Description),
+      str_trim(as.character(Category)) != "",
+      str_trim(as.character(Description)) != ""
+    ) %>%
+    group_by(Category) %>%
+    summarise(
+      bullet = paste0(
+        as.character(first(Category)),
+        ": ",
+        paste(head(Description, max_desc_per_category), collapse = ", ")
+      ),
+      .groups = "drop"
+    ) %>%
+    slice_head(n = max_bullets)
+
+  desc <- rep(NA_character_, 5)
+
+  if (nrow(stack_grouped) > 0) {
+    n_desc <- min(nrow(stack_grouped), 5)
+    desc[seq_len(n_desc)] <- stack_grouped$bullet[seq_len(n_desc)]
+  }
+
+  tibble(
+    section = "academic_articles",
+    title = "Skills & stack",
+    loc = NA_character_,
+    institution = NA_character_,
+    start = NA_character_,
+    end = NA_character_,
+    description_1 = desc[1],
+    description_2 = desc[2],
+    description_3 = desc[3],
+    description_4 = desc[4],
+    description_5 = desc[5],
+    in_resume = TRUE
+  )
+}
+
 select_relevant_role_content <- function(
   role,
   role_detail_df,
@@ -124,7 +172,7 @@ select_relevant_role_content <- function(
       item_id = paste0("achievement_", row_number()),
       item_type = "achievement",
       text = as.character(raw_text),
-      must_use = if ("must_use" %in% names(.)) to_logical_flag(must_use) else FALSE,
+      must_use = if ("must_use" %in% names(.)) to_logical_flag(must_use) else if ("default_include" %in% names(.)) to_logical_flag(default_include) else FALSE,
       priority = if ("priority" %in% names(.)) as.character(priority) else NA_character_
     ) %>%
     select(item_id, item_type, text, must_use, priority)
@@ -497,7 +545,7 @@ generate_role_entries <- function(
 
       "Style rules:\n",
       "- Keep bullets concise and professional.\n",
-      "- Around 20 words per bullet.\n",
+      "- Around 15 words per bullet.\n",
       "- Do NOT invent experience, metrics, scope, tools, responsibilities, or results.\n",
       "- Return plain text only, one bullet per line."
     )
@@ -540,7 +588,7 @@ generate_education_entries <- function(workbook_path) {
     mutate(
       section = "education",
       title = paste(degree, field, sep = ", "),
-      loc = loc,
+      loc = NA_character_,
       institution = institution,
       start = as.character(start),
       end = as.character(end),
@@ -696,6 +744,8 @@ generate_cv_entries <- function(
   api_key = Sys.getenv("OPENAI_API_KEY"),
   role_max_bullets = 4,
   academic_max_bullets = 2,
+  stack_max_bullets = 5,
+  stack_max_desc_per_category = 3,
   selected_role_ids = NULL,
   min_metrics_per_role = 1,
   max_details_keep = 2,
@@ -737,9 +787,16 @@ generate_cv_entries <- function(
     max_bullets = academic_max_bullets
   )
 
+  stack_df <- generate_stack_entries(
+    workbook_path = workbook_path,
+    max_bullets = stack_max_bullets,
+    max_desc_per_category = stack_max_desc_per_category
+  )
+
   bind_rows(
     pad_description_cols(roles_df),
     pad_description_cols(education_df),
-    pad_description_cols(academic_df)
+    pad_description_cols(academic_df),
+    pad_description_cols(stack_df)
   )
 }

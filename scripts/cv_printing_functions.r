@@ -78,8 +78,8 @@ create_CV_object <- function(data_location,
       start = as.character(start),
       end = as.character(end),
       description_bullets = ifelse(description_bullets != "", paste0("- ", description_bullets), ""),
-      start = ifelse(start == "NULL", NA, start),
-      end = ifelse(end == "NULL", NA, end),
+      start = ifelse(start %in% c("NULL", "NA") | is.na(start), NA, start),
+      end = ifelse(end %in% c("NULL", "NA") | is.na(end), NA, end),
       start_year = extract_year(start),
       end_year = extract_year(end),
       no_start = is.na(start),
@@ -150,9 +150,11 @@ print_section <- function(cv, section_id, glue_template = "default"){
 
   section_data <- dplyr::filter(cv$entries_data, section == section_id)
 
+  if(nrow(section_data) == 0) return(invisible(cv))
+
   # Take entire entries data frame and removes the links in descending order
   # so links for the same position are right next to each other in number.
-  for(i in 1:nrow(section_data)){
+  for(i in seq_len(nrow(section_data))){
     for(col in c('title', 'description_bullets')){
       strip_res <- sanitize_links(cv, section_data[i, col])
       section_data[i, col] <- strip_res$text
