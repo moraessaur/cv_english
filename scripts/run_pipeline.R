@@ -23,6 +23,7 @@ source("R/pipeline_helpers.R")
 # CONFIG
 # =========================
 
+
 cfg <- make_pipeline_config(
   file_stem = "nestle",
   job_description_stem = "nestle",
@@ -40,6 +41,19 @@ cfg <- make_pipeline_config(
   drive_sheet_folder = "mimic_tear/renders/sheets",
   input_file = "scripts/cv.rmd",
   pdf_mode = TRUE
+)
+
+# =========================
+# DOWNLOAD MASTER FROM GOOGLE DRIVE
+# =========================
+
+drive_auth()
+
+drive_download(
+  file = as_id("1XoA9TXpG0P2LSh2jJ-lWGiy8zGNNdb81_wgnaxH-S4A"),
+  path = cfg$workbook_path,
+  type = "xlsx",
+  overwrite = TRUE
 )
 
 

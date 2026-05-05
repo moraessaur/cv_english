@@ -670,6 +670,52 @@ generate_academic_entries <- function(
   bind_rows(out)
 }
 
+generate_skills_stack_entries <- function(
+  workbook_path,
+  max_bullets = 5,
+  max_items_per_bullet = 3
+) {
+  skills <- read_excel(workbook_path, sheet = "skills_stack")
+
+  bullets <- skills %>%
+    filter(
+      !is.na(Category),
+      !is.na(Description),
+      str_trim(as.character(Category)) != "",
+      str_trim(as.character(Description)) != ""
+    ) %>%
+    group_by(Category) %>%
+    summarise(
+      bullet = paste0(
+        first(Category),
+        ": ",
+        paste(head(Description, max_items_per_bullet), collapse = ", ")
+      ),
+      .groups = "drop"
+    ) %>%
+    slice_head(n = max_bullets) %>%
+    pull(bullet)
+
+  desc <- rep(NA_character_, 5)
+  desc[seq_len(min(length(bullets), 5))] <- bullets[seq_len(min(length(bullets), 5))]
+
+  tibble(
+    section = "academic_articles",
+    title = "Skills & stack",
+    loc = NA_character_,
+    institution = NA_character_,
+    start = NA_character_,
+    end = NA_character_,
+    description_1 = desc[1],
+    description_2 = desc[2],
+    description_3 = desc[3],
+    description_4 = desc[4],
+    description_5 = desc[5],
+    in_resume = TRUE
+  )
+}
+
+
 pad_description_cols <- function(df, max_desc = 5) {
   for (i in seq_len(max_desc)) {
     col <- paste0("description_", i)
@@ -727,15 +773,10 @@ generate_cv_entries <- function(
 
   education_df <- generate_education_entries(workbook_path)
 
-  academic_df <- generate_academic_entries(
-    workbook_path = workbook_path,
-    variant = academic_variant,
-    job_description = job_description,
-    tailoring_brief = tailoring_brief,
-    model = model,
-    api_key = api_key,
-    max_bullets = academic_max_bullets
-  )
+  academic_df <- generate_skills_stack_entries(
+  workbook_path = workbook_path,
+  max_bullets = academic_max_bullets,
+  max_items_per_bullet = 2)
 
   bind_rows(
     pad_description_cols(roles_df),
