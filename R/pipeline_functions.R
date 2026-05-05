@@ -649,6 +649,9 @@ generate_skills_stack_entries <- function(
 
   bullets <- split_bullets(model_output, max_bullets = max_bullets)
 
+  bullets <- stringr::str_squish(bullets)
+  bullets <- stringr::str_trunc(bullets, width = 90, side = "right")
+
   desc <- rep(NA_character_, 5)
   n_desc <- min(length(bullets), 5)
   desc[seq_len(n_desc)] <- bullets[seq_len(n_desc)]

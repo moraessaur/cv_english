@@ -134,7 +134,7 @@ CV %<>% print_text_block('recent_professional_experience_aside')
 
 
 
-```{r}
+```{r,eval=FALSE}
 CV %<>% print_section('education')
 ```
 

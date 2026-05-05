@@ -7,7 +7,7 @@ Rules:
 - Avoid long explanations.
 - Avoid repeating similar tools across bullets.
 - Each bullet should be short and readable.
-- Maximum 12 words per bullet.
+- Maximum 15 words per bullet.
 - Do not invent skills.
 - Return plain text only.
 - One bullet per line.

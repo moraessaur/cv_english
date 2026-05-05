@@ -25,8 +25,8 @@ source("R/pipeline_helpers.R")
 
 
 cfg <- make_pipeline_config(
-  file_stem = "nestle",
-  job_description_stem = "nestle",
+  file_stem = "telus",
+  job_description_stem = "telus",
   recruiter_message_stem =  NULL,
   optional_obs = NULL,
   role_variant = "retail",
@@ -130,6 +130,66 @@ render_cv_from_sheet(
   pdf_mode = cfg$pdf_mode
 )
 
+# =========================
+# NORMALIZE RENDER OUTPUT PATHS
+# =========================
+
+render_base_dir <- dirname(cfg$input_file)
+
+html_path <- normalizePath(
+  file.path(render_base_dir, cfg$html_out),
+  mustWork = FALSE
+)
+
+pdf_path <- normalizePath(
+  file.path(render_base_dir, cfg$pdf_out),
+  mustWork = FALSE
+)
+
+cat("HTML path:", html_path, "\n")
+cat("HTML exists:", file.exists(html_path), "\n")
+
+
+# =========================
+# UPLOAD HTML TO DRIVE
+# =========================
+
+if (!file.exists(html_path)) {
+  stop("Rendered HTML not found at: ", html_path)
+}
+
+html_file <- drive_upload(
+  media = html_path,
+  path = "mimic_tear/renders/cvs/html",
+  name = basename(html_path),
+  type = "text/html"
+)
+
+drive_share(html_file, role = "reader", type = "anyone")
+
+# =========================
+# GENERATE PDF FROM HTML + UPLOAD
+# =========================
+
+if (cfg$pdf_mode) {
+  pagedown::chrome_print(
+    input = html_path,
+    output = pdf_path
+  )
+
+  if (!file.exists(pdf_path)) {
+    stop("Rendered PDF not found at: ", pdf_path)
+  }
+
+  pdf_file <- drive_upload(
+    media = pdf_path,
+    path = "mimic_tear/renders/cvs/pdf",
+    name = basename(pdf_path),
+    type = "application/pdf"
+  )
+
+  drive_share(pdf_file, role = "reader", type = "anyone")
+}
 cat("Rendered HTML:", cfg$html_out, "\n")
 cat("Planned PDF path:", cfg$pdf_out, "\n")
 cat("Job description path:", cfg$job_description_path %||% "NULL", "\n")
