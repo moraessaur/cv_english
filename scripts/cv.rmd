@@ -144,7 +144,7 @@ About me {data-icon=book}
 --------------------------------------------------------------------------------
 
 ```{r}
-CV %<>% print_section('academic_articles')
+CV %<>% print_section('skills_stack')
 ```
 
 

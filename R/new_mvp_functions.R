@@ -672,35 +672,101 @@ generate_academic_entries <- function(
 
 generate_skills_stack_entries <- function(
   workbook_path,
+  variant = "mlops_heavy",
+  job_description = NULL,
+  recruiter_message = NULL,
+  tailoring_brief = NULL,
+  model = "gpt-4.1-mini",
+  api_key = Sys.getenv("OPENAI_API_KEY"),
   max_bullets = 5,
-  max_items_per_bullet = 3
+  max_skills_per_category = NULL,
+  allow_lumping = TRUE
 ) {
-  skills <- read_excel(workbook_path, sheet = "skills_stack")
-
-  bullets <- skills %>%
+  skills <- read_excel(workbook_path, sheet = "skills_stack") %>%
     filter(
       !is.na(Category),
       !is.na(Description),
       str_trim(as.character(Category)) != "",
       str_trim(as.character(Description)) != ""
-    ) %>%
-    group_by(Category) %>%
-    summarise(
-      bullet = paste0(
-        first(Category),
-        ": ",
-        paste(head(Description, max_items_per_bullet), collapse = ", ")
-      ),
-      .groups = "drop"
-    ) %>%
-    slice_head(n = max_bullets) %>%
-    pull(bullet)
+    )
+
+  if (!is.null(max_skills_per_category)) {
+    skills <- skills %>%
+      group_by(Category) %>%
+      slice_head(n = max_skills_per_category) %>%
+      ungroup()
+  }
+
+  prompt_path <- file.path("prompts/skills_stack", paste0(variant, ".md"))
+
+  if (!file.exists(prompt_path)) {
+    stop("Skills stack prompt not found: ", prompt_path)
+  }
+
+  variant_prompt <- read_file(prompt_path)
+
+  skills_json <- jsonlite::toJSON(
+    skills,
+    dataframe = "rows",
+    auto_unbox = TRUE,
+    pretty = TRUE,
+    na = "null"
+  )
+
+  tailoring_text <- if (!is.null(tailoring_brief)) {
+    format_tailoring_brief(tailoring_brief, section = "academic")
+  } else {
+    ""
+  }
+
+  jd_text <- if (!is.null(job_description) && nzchar(paste(job_description, collapse = ""))) {
+    paste0("\n\nJob description:\n", paste(job_description, collapse = "\n"))
+  } else {
+    ""
+  }
+
+  recruiter_text <- if (!is.null(recruiter_message) && nzchar(paste(recruiter_message, collapse = ""))) {
+    paste0("\n\nRecruiter message:\n", paste(recruiter_message, collapse = "\n"))
+  } else {
+    ""
+  }
+
+  prompt <- paste0(
+    variant_prompt,
+    "\n\n---\n\n",
+    tailoring_text,
+    jd_text,
+    recruiter_text,
+    "\n\n---\n\n",
+    "Available skills from spreadsheet:\n",
+    skills_json,
+    "\n\n---\n\n",
+    "Task:\n",
+    "Create the Skills & stack CV section.\n",
+    "Use only the provided skills.\n",
+    "Return at most ", max_bullets, " bullets.\n",
+    if (allow_lumping) {
+      "You may combine related skills into the same bullet when useful.\n"
+    } else {
+      "Do not combine unrelated categories in the same bullet.\n"
+    },
+    "Return plain text only, one bullet per line."
+  )
+
+  model_output <- call_openai_text(
+    prompt = prompt,
+    model = model,
+    api_key = api_key
+  )
+
+  bullets <- split_bullets(model_output, max_bullets = max_bullets)
 
   desc <- rep(NA_character_, 5)
-  desc[seq_len(min(length(bullets), 5))] <- bullets[seq_len(min(length(bullets), 5))]
+  n_desc <- min(length(bullets), 5)
+  desc[seq_len(n_desc)] <- bullets[seq_len(n_desc)]
 
   tibble(
-    section = "academic_articles",
+    section = "skills_stack",
     title = "Skills & stack",
     loc = NA_character_,
     institution = NA_character_,
@@ -746,7 +812,9 @@ generate_cv_entries <- function(
   min_metrics_per_role = 1,
   max_details_keep = 2,
   max_achievements_keep = 2,
-  max_metrics_keep = 2
+  max_metrics_keep = 2,
+  max_skills_per_category = NULL,
+  allow_lumping = TRUE
 ) {
   tailoring_brief <- generate_tailoring_brief(
     job_description = job_description,
@@ -773,14 +841,22 @@ generate_cv_entries <- function(
 
   education_df <- generate_education_entries(workbook_path)
 
-  academic_df <- generate_skills_stack_entries(
-  workbook_path = workbook_path,
-  max_bullets = academic_max_bullets,
-  max_items_per_bullet = 2)
+  stack_df <- generate_skills_stack_entries(
+    workbook_path = workbook_path,
+    variant = academic_variant,
+    job_description = job_description,
+    recruiter_message = recruiter_message,
+    tailoring_brief = tailoring_brief,
+    model = model,
+    api_key = api_key,
+    max_bullets = academic_max_bullets,
+    max_skills_per_category = max_skills_per_category,
+    allow_lumping = allow_lumping
+  )
 
   bind_rows(
     pad_description_cols(roles_df),
     pad_description_cols(education_df),
-    pad_description_cols(academic_df)
+    pad_description_cols(stack_df)
   )
 }
