@@ -12,7 +12,7 @@ library(googledrive)
 
 source("R/gpt_functions.R")
 source("R/utils.R")
-source("R/new_mvp_functions.R")
+source("R/pipeline_functions.R")
 source("R/render.R")
 source("R/job_rec_descriptions_functions.R")
 source("R/pipeline_helpers.R")
