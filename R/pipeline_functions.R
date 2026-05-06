@@ -646,6 +646,9 @@ generate_skills_stack_entries <- function(
       "Use ONLY the provided skills.\n",
       "Do NOT invent tools, frameworks, domains, employers, or results.\n",
       "Return at most ", max_bullets_per_category, " bullets.\n",
+      "IMPORTANT:\n",
+      "Prefer explicit technology names from the source text.\n",
+      "At least one concrete technology/library/platform should appear in every bullet.\n",
       "Return plain text only, one bullet per line."
     )
 

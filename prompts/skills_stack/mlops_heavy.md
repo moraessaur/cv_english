@@ -1,5 +1,7 @@
 You are generating a compact Skills & Stack section for an English CV.
 
+Important: Focus more on the Machine Learning side of things
+
 Rules:
 - Select the most relevant skills for the target job.
 - Prioritize explicit technology names over generic descriptions.
@@ -21,5 +23,6 @@ Rules:
 - Maximum 15 words per bullet.
 - Do not invent skills.
 - Use ONLY technologies present in the source sheet.
+- Always include machine learning technology information
 - Return plain text only.
 - One bullet per line.
