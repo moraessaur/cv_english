@@ -62,38 +62,15 @@ Relevant professional experience {data-icon=suitcase}
 
 ::: aside
 
-**Contact**
+**Education & Contact**
 
-<i class="fa fa-home"></i> [lucasmoraes.io](https://lucasmoraes.io)
+<i class="fa fa-envelope"></i> mSC & bSC in Genetics and Molecular Biology
 
 <i class="fa fa-envelope"></i> moraessaur@gmail.com
 
 <i class="fa fa-github"></i> [GitHub: `@`moraessaur](https://github.com/moraessaur)
 
 <i class="fab fa-linkedin-in"></i> [LinkedIn](https://www.linkedin.com/in/lucas-moraes-msc-78944a32/)
-
-<br>
-
-**Technical stack**
-**__________________**
-
-<i class="fa-solid fa-code-merge"></i> **Git**
-
-<i class="fab fa-r-project"></i> **R**
-
-<i class="fab fa-python"></i> **Python**
-
-<i class="fa fa-database"></i> **SQL**
-
-<i class="fa-solid fa-star"></i> **Spark**
-
-<i class="fa-solid fa-circle-nodes"></i> **Databricks**
-
-<i class="fas fa-chart-bar"></i> **Statistics**
-
-<i class="fas fa-robot"></i> **Machine Learning**
-
-<i class="fas fa-chart-area"></i> **Data Viz**
 
 <i class="fas fa-award"></i> **Fluent English**
 
@@ -105,20 +82,20 @@ CV %<>% print_section("recent_professional_experience")
 
 \newpage
 
-About me {data-icon=book}
+Skills & Stack {#about-me data-icon=laptop-code}
 --------------------------------------------------------------------------------
 
 ```{r}
 CV %<>% print_section(
   "skills_stack",
   glue_template = "
-<div class='skills-stack-block'>
+<div class='skills-stack-entry'>
 
-<strong>{title}</strong>
+<div class='skills-stack-title'>{title}</div>
 
 {description_bullets}
 
 </div>
-\n\n\n"
+\n\n"
 )
 ```

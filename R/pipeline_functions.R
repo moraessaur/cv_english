@@ -566,23 +566,36 @@ generate_skills_stack_entries <- function(
   tailoring_brief = NULL,
   model = "gpt-4.1-mini",
   api_key = Sys.getenv("OPENAI_API_KEY"),
-  max_bullets = 5,
+  max_bullets_per_category = 2,
+  max_categories = NULL,
   max_skills_per_category = NULL,
   allow_lumping = TRUE
 ) {
-  skills <- read_excel(workbook_path, sheet = "skills_stack") %>%
-    filter(
+  skills <- readxl::read_excel(workbook_path, sheet = "skills_stack") |>
+    dplyr::filter(
       !is.na(Category),
       !is.na(Description),
-      str_trim(as.character(Category)) != "",
-      str_trim(as.character(Description)) != ""
+      stringr::str_trim(as.character(Category)) != "",
+      stringr::str_trim(as.character(Description)) != ""
     )
 
   if (!is.null(max_skills_per_category)) {
-    skills <- skills %>%
-      group_by(Category) %>%
-      slice_head(n = max_skills_per_category) %>%
-      ungroup()
+    skills <- skills |>
+      dplyr::group_by(Category) |>
+      dplyr::slice_head(n = max_skills_per_category) |>
+      dplyr::ungroup()
+  }
+
+  grouped_skills <- skills |>
+    dplyr::group_by(Category) |>
+    dplyr::summarise(
+      source_text = paste(Description, collapse = "; "),
+      .groups = "drop"
+    )
+
+  if (!is.null(max_categories)) {
+    grouped_skills <- grouped_skills |>
+      dplyr::slice_head(n = max_categories)
   }
 
   prompt_path <- file.path("prompts/skills_stack", paste0(variant, ".md"))
@@ -591,85 +604,81 @@ generate_skills_stack_entries <- function(
     stop("Skills stack prompt not found: ", prompt_path)
   }
 
-  variant_prompt <- read_file(prompt_path)
+  variant_prompt <- readr::read_file(prompt_path)
 
-  skills_json <- jsonlite::toJSON(
-    skills,
-    dataframe = "rows",
-    auto_unbox = TRUE,
-    pretty = TRUE,
-    na = "null"
-  )
+  out <- vector("list", nrow(grouped_skills))
 
-  tailoring_text <- if (!is.null(tailoring_brief)) {
-    format_tailoring_brief(tailoring_brief, section = "academic")
-  } else {
-    ""
-  }
+  for (i in seq_len(nrow(grouped_skills))) {
+    row <- grouped_skills[i, ]
 
-  jd_text <- if (!is.null(job_description) && nzchar(paste(job_description, collapse = ""))) {
-    paste0("\n\nJob description:\n", paste(job_description, collapse = "\n"))
-  } else {
-    ""
-  }
-
-  recruiter_text <- if (!is.null(recruiter_message) && nzchar(paste(recruiter_message, collapse = ""))) {
-    paste0("\n\nRecruiter message:\n", paste(recruiter_message, collapse = "\n"))
-  } else {
-    ""
-  }
-
-  prompt <- paste0(
-    variant_prompt,
-    "\n\n---\n\n",
-    tailoring_text,
-    jd_text,
-    recruiter_text,
-    "\n\n---\n\n",
-    "Available skills from spreadsheet:\n",
-    skills_json,
-    "\n\n---\n\n",
-    "Task:\n",
-    "Create the Skills & stack CV section.\n",
-    "Use only the provided skills.\n",
-    "Return at most ", max_bullets, " bullets.\n",
-    if (allow_lumping) {
-      "You may combine related skills into the same bullet when useful.\n"
+    jd_text <- if (!is.null(job_description) && nzchar(paste(job_description, collapse = ""))) {
+      paste0("\n\nJob description:\n", paste(job_description, collapse = "\n"))
     } else {
-      "Do not combine unrelated categories in the same bullet.\n"
-    },
-    "Return plain text only, one bullet per line."
-  )
+      ""
+    }
 
-  model_output <- call_openai_text(
-    prompt = prompt,
-    model = model,
-    api_key = api_key
-  )
+    recruiter_text <- if (!is.null(recruiter_message) && nzchar(paste(recruiter_message, collapse = ""))) {
+      paste0("\n\nRecruiter message:\n", paste(recruiter_message, collapse = "\n"))
+    } else {
+      ""
+    }
 
-  bullets <- split_bullets(model_output, max_bullets = max_bullets)
+    tailoring_text <- if (!is.null(tailoring_brief)) {
+      format_tailoring_brief(tailoring_brief, section = "academic")
+    } else {
+      ""
+    }
 
-  bullets <- stringr::str_squish(bullets)
-  bullets <- stringr::str_trunc(bullets, width = 90, side = "right")
+    prompt <- paste0(
+      variant_prompt,
+      "\n\n---\n\n",
+      tailoring_text,
+      jd_text,
+      recruiter_text,
+      "\n\n---\n\n",
+      "Skills category:\n",
+      row$Category,
+      "\n\nSource skills:\n",
+      row$source_text,
+      "\n\n---\n\n",
+      "Task:\n",
+      "Create compact CV bullet points for this skills category.\n",
+      "Use ONLY the provided skills.\n",
+      "Do NOT invent tools, frameworks, domains, employers, or results.\n",
+      "Return at most ", max_bullets_per_category, " bullets.\n",
+      "Return plain text only, one bullet per line."
+    )
 
-  desc <- rep(NA_character_, 5)
-  n_desc <- min(length(bullets), 5)
-  desc[seq_len(n_desc)] <- bullets[seq_len(n_desc)]
+    model_output <- call_openai_text(
+      prompt = prompt,
+      model = model,
+      api_key = api_key
+    )
 
-  tibble(
-    section = "skills_stack",
-    title = "Skills & stack",
-    loc = NA_character_,
-    institution = NA_character_,
-    start = NA_character_,
-    end = NA_character_,
-    description_1 = desc[1],
-    description_2 = desc[2],
-    description_3 = desc[3],
-    description_4 = desc[4],
-    description_5 = desc[5],
-    in_resume = TRUE
-  )
+    bullets <- split_bullets(model_output, max_bullets = max_bullets_per_category)
+    bullets <- stringr::str_squish(bullets)
+
+    desc <- rep(NA_character_, 5)
+    n_desc <- min(length(bullets), 5)
+    desc[seq_len(n_desc)] <- bullets[seq_len(n_desc)]
+
+    out[[i]] <- tibble::tibble(
+      section = "skills_stack",
+      title = as.character(row$Category),
+      loc = NA_character_,
+      institution = NA_character_,
+      start = NA_character_,
+      end = NA_character_,
+      description_1 = desc[1],
+      description_2 = desc[2],
+      description_3 = desc[3],
+      description_4 = desc[4],
+      description_5 = desc[5],
+      in_resume = TRUE
+    )
+  }
+
+  dplyr::bind_rows(out)
 }
 
 
@@ -705,7 +714,8 @@ generate_cv_entries <- function(
   max_achievements_keep = 2,
   max_metrics_keep = 2,
   max_skills_per_category = NULL,
-  allow_lumping = TRUE
+  allow_lumping = TRUE,
+  max_categories = NULL
 ) {
   tailoring_brief <- generate_tailoring_brief(
     job_description = job_description,
@@ -740,12 +750,13 @@ generate_cv_entries <- function(
     tailoring_brief = tailoring_brief,
     model = model,
     api_key = api_key,
-    max_bullets = academic_max_bullets,
+    max_bullets_per_category = academic_max_bullets,
     max_skills_per_category = max_skills_per_category,
-    allow_lumping = allow_lumping
+    allow_lumping = allow_lumping,
+    max_categories = max_categories
   )
 
-  bind_rows(
+  dplyr::bind_rows(
     pad_description_cols(roles_df),
     pad_description_cols(education_df),
     pad_description_cols(stack_df)

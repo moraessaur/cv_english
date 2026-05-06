@@ -77,7 +77,8 @@ entries <- generate_cv_entries(
   academic_max_bullets = cfg$academic_max_bullets,
   selected_role_ids = cfg$selected_role_ids,
   job_description = cfg$job_description,
-  recruiter_message = cfg$recruiter_message
+  recruiter_message = cfg$recruiter_message,
+  max_categories = 4
 )
 
 entries <- entries |>
