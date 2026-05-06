@@ -18,19 +18,17 @@ source("R/job_rec_descriptions_functions.R")
 source("R/pipeline_helpers.R")
 
 
-
 # =========================
 # CONFIG
 # =========================
 
-
 cfg <- make_pipeline_config(
   file_stem = "telus",
   job_description_stem = "telus",
-  recruiter_message_stem =  NULL,
+  recruiter_message_stem = NULL,
   optional_obs = NULL,
   role_variant = "retail",
-  academic_variant = "mlops_heavy", # academic skills & tech stack
+  academic_variant = "mlops_heavy",
   role_max_bullets = 4,
   academic_max_bullets = 3,
   selected_role_ids = c(4, 3, 2),
@@ -42,6 +40,7 @@ cfg <- make_pipeline_config(
   input_file = "scripts/cv.rmd",
   pdf_mode = TRUE
 )
+
 
 # =========================
 # DOWNLOAD MASTER FROM GOOGLE DRIVE
@@ -84,6 +83,47 @@ entries <- generate_cv_entries(
 entries <- entries |>
   mutate(loc = institution) |>
   mutate(institution = NA)
+
+
+# =========================
+# DEBUG: CHECK FOR HTML TAGS THAT CAN BREAK PAGEDOWN
+# =========================
+
+cat("\n=== Checking generated entries for <abbr> tags ===\n")
+
+entries |>
+  select(starts_with("description_")) |>
+  summarise(across(
+    everything(),
+    ~ any(str_detect(.x, "<abbr|</abbr"), na.rm = TRUE)
+  )) |>
+  print()
+
+
+# =========================
+# SANITIZE GENERATED TEXT BEFORE RENDERING
+# =========================
+
+entries <- entries |>
+  mutate(across(
+    where(is.character),
+    ~ str_replace_all(.x, "</?abbr[^>]*>", "")
+  ))
+
+
+# =========================
+# DEBUG: CHECK GENERATED SECTIONS
+# =========================
+
+cat("\n=== Sections generated ===\n")
+print(entries |> count(section))
+
+cat("\n=== Skills stack preview ===\n")
+print(
+  entries |>
+    filter(section == "skills_stack") |>
+    select(title, starts_with("description_"))
+)
 
 
 # =========================
@@ -130,6 +170,7 @@ render_cv_from_sheet(
   pdf_mode = cfg$pdf_mode
 )
 
+
 # =========================
 # NORMALIZE RENDER OUTPUT PATHS
 # =========================
@@ -167,29 +208,49 @@ html_file <- drive_upload(
 
 drive_share(html_file, role = "reader", type = "anyone")
 
+
 # =========================
 # GENERATE PDF FROM HTML + UPLOAD
 # =========================
 
 if (cfg$pdf_mode) {
-  pagedown::chrome_print(
-    input = html_path,
-    output = pdf_path
-  )
+  pdf_result <- tryCatch({
 
-  if (!file.exists(pdf_path)) {
-    stop("Rendered PDF not found at: ", pdf_path)
-  }
+    pagedown::chrome_print(
+      input = html_path,
+      output = pdf_path,
+      timeout = 120
+    )
 
-  pdf_file <- drive_upload(
-    media = pdf_path,
-    path = "mimic_tear/renders/cvs/pdf",
-    name = basename(pdf_path),
-    type = "application/pdf"
-  )
+    if (!file.exists(pdf_path)) {
+      stop("Rendered PDF not found at: ", pdf_path)
+    }
 
-  drive_share(pdf_file, role = "reader", type = "anyone")
+    pdf_file <- drive_upload(
+      media = pdf_path,
+      path = "mimic_tear/renders/cvs/pdf",
+      name = basename(pdf_path),
+      type = "application/pdf"
+    )
+
+    drive_share(pdf_file, role = "reader", type = "anyone")
+
+    cat("PDF uploaded successfully:", basename(pdf_path), "\n")
+
+    TRUE
+
+  }, error = function(e) {
+    cat("\nPDF generation failed, but HTML was created successfully.\n")
+    cat("Reason:", conditionMessage(e), "\n")
+    FALSE
+  })
 }
+
+
+# =========================
+# FINAL LOGS
+# =========================
+
 cat("Rendered HTML:", cfg$html_out, "\n")
 cat("Planned PDF path:", cfg$pdf_out, "\n")
 cat("Job description path:", cfg$job_description_path %||% "NULL", "\n")

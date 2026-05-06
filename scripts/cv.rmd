@@ -15,19 +15,14 @@ output:
 
 ```{r, include=FALSE}
 knitr::opts_chunk$set(
-  results='asis', 
+  results = 'asis',
   echo = FALSE
 )
 
-library(magrittr) # For the pipe
-
-cat("CHUNK WD:", getwd(), "\n")
-cat("Exists R/...", file.exists("R/cv_printing_functions.r"), "\n")
-cat("Exists ../R/...", file.exists("../R/cv_printing_functions.r"), "\n")
+library(magrittr)
 
 source("cv_printing_functions.r")
 
-# Read in all data and initialize a CV printer object
 CV <- create_CV_object(
   data_location = params$data_location,
   pdf_mode = params$pdf_mode,
@@ -35,11 +30,9 @@ CV <- create_CV_object(
 )
 ```
 
-
 ```{r}
-# When in pdf export mode the little dots are unaligned, so fix that with some conditional CSS.
-if(params$pdf_mode) {
-    cat("
+if (params$pdf_mode) {
+  cat("
 <style>
 :root{
   --decorator-outer-offset-left: -6.5px;
@@ -48,7 +41,6 @@ if(params$pdf_mode) {
 }
 ```
 
-
 Main
 ================================================================================
 
@@ -56,10 +48,11 @@ Lucas Moraes {#title}
 --------------------------------------------------------------------------------
 
 <p align="justify">
+
 ```{r}
-# Note the special double pipe so we modify the CV object in place
-CV %<>% print_text_block("intro") 
+CV %<>% print_text_block("intro")
 ```
+
 </p>
 
 <br>
@@ -68,6 +61,7 @@ Relevant professional experience {data-icon=suitcase}
 --------------------------------------------------------------------------------
 
 ::: aside
+
 **Contact**
 
 <i class="fa fa-home"></i> [lucasmoraes.io](https://lucasmoraes.io)
@@ -78,34 +72,7 @@ Relevant professional experience {data-icon=suitcase}
 
 <i class="fab fa-linkedin-in"></i> [LinkedIn](https://www.linkedin.com/in/lucas-moraes-msc-78944a32/)
 
-:::
-
-
-
-```{r}
-CV %<>% print_section('recent_professional_experience')
-```
 <br>
-<br>
-<br>
-<br>
-<br>
-<br>
-<br>
-<br>
-<br>
-<br>
-
-
-Education {data-icon=graduation-cap data-concise=true}
---------------------------------------------------------------------------------
-
-::: aside
-```{r,eval=FALSE}
-# Tirei isso aqui com eval, eh a intro secundaria na barra lateral
-CV %<>% print_text_block('recent_professional_experience_aside')
-```
-
 
 **Technical stack**
 **__________________**
@@ -120,7 +87,7 @@ CV %<>% print_text_block('recent_professional_experience_aside')
 
 <i class="fa-solid fa-star"></i> **Spark**
 
-<i class="fa-solid fa-circle-nodes"></i> **Data Bricks**
+<i class="fa-solid fa-circle-nodes"></i> **Databricks**
 
 <i class="fas fa-chart-bar"></i> **Statistics**
 
@@ -128,26 +95,28 @@ CV %<>% print_text_block('recent_professional_experience_aside')
 
 <i class="fas fa-chart-area"></i> **Data Viz**
 
-<i class="fas fa-award"></i> **Fluent english**
+<i class="fas fa-award"></i> **Fluent English**
 
 :::
 
-
-
-```{r,eval=FALSE}
-CV %<>% print_section('education')
+```{r}
+CV %<>% print_section("recent_professional_experience")
 ```
-
-
 
 About me {data-icon=book}
 --------------------------------------------------------------------------------
 
 ```{r}
-CV %<>% print_section('skills_stack')
+CV %<>% print_section(
+  "skills_stack",
+  glue_template = "
+<div class='skills-stack-block'>
+
+<strong>{title}</strong>
+
+{description_bullets}
+
+</div>
+\n\n\n"
+)
 ```
-
-
-
-
-
