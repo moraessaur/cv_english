@@ -587,7 +587,7 @@ generate_skills_stack_entries <- function(
   }
 
   grouped_skills <- skills |>
-    dplyr::group_by(Category) |>
+    dplyr::group_by(Section) |>
     dplyr::summarise(
       source_text = paste(Description, collapse = "; "),
       .groups = "drop"
@@ -637,7 +637,7 @@ generate_skills_stack_entries <- function(
       recruiter_text,
       "\n\n---\n\n",
       "Skills category:\n",
-      row$Category,
+      row$Section,
       "\n\nSource skills:\n",
       row$source_text,
       "\n\n---\n\n",
@@ -667,7 +667,7 @@ generate_skills_stack_entries <- function(
 
     out[[i]] <- tibble::tibble(
       section = "skills_stack",
-      title = as.character(row$Category),
+      title = as.character(row$Section),
       loc = NA_character_,
       institution = NA_character_,
       start = NA_character_,
