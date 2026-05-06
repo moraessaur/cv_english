@@ -30,7 +30,7 @@ cfg <- make_pipeline_config(
   role_variant = "retail",
   academic_variant = "mlops_heavy",
   role_max_bullets = 3,
-  academic_max_bullets = 3,
+  academic_max_bullets = 5,
   selected_role_ids = c(4, 3, 2),
   source_file = "data/cv_new_reworked.xlsx",
   workbook_path = "data/cv_main.xlsx",
@@ -78,7 +78,7 @@ entries <- generate_cv_entries(
   selected_role_ids = cfg$selected_role_ids,
   job_description = cfg$job_description,
   recruiter_message = cfg$recruiter_message,
-  max_categories = 4
+  max_categories = 5
 )
 
 entries <- entries |>
