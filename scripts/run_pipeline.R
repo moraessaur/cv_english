@@ -29,7 +29,7 @@ cfg <- make_pipeline_config(
   optional_obs = NULL,
   role_variant = "retail",
   academic_variant = "mlops_heavy",
-  role_max_bullets = 4,
+  role_max_bullets = 3,
   academic_max_bullets = 3,
   selected_role_ids = c(4, 3, 2),
   source_file = "data/cv_new_reworked.xlsx",

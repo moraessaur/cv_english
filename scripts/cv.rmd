@@ -103,6 +103,8 @@ Relevant professional experience {data-icon=suitcase}
 CV %<>% print_section("recent_professional_experience")
 ```
 
+\newpage
+
 About me {data-icon=book}
 --------------------------------------------------------------------------------
 
