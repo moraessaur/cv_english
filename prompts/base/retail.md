@@ -1,6 +1,9 @@
 Rewrite CV content clearly and truthfully.
 Around 20 words per bullet.
 
+Context:
+- This cv should be directed to openings in a scientific setting
+
 Rules:
 - Do not invent experience, tools, or metrics.
 - Keep wording concise and professional.

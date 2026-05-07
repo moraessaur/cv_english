@@ -23,8 +23,8 @@ source("R/pipeline_helpers.R")
 # =========================
 
 cfg <- make_pipeline_config(
-  file_stem = "nestle",
-  job_description_stem = "nestle",
+  file_stem = "mondelez",
+  job_description_stem = "mondelez",
   recruiter_message_stem = NULL,
   optional_obs = NULL,
   role_variant = "retail",
