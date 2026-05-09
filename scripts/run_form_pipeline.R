@@ -17,17 +17,17 @@ source("R/form_answers.R")
 #mode <- "summaries"
 mode <- "question"
 
-question <- "Describe your experience building and deploying machine learning or data science solutions."
+question <- readr::read_file("prompts/forms/questions/riachuelo.md")
 
 cfg <- make_pipeline_config(
-  file_stem = "mondelez",
-  job_description_stem = "mondelez",
+  file_stem = "riachuelo",
+  job_description_stem = "riachuelo",
   recruiter_message_stem = NULL,
   source_file = "data/cv_main.xlsx",
   workbook_path = "data/cv_main.xlsx"
 )
 
-selected_role_ids <- c(4, 3, 2)
+selected_role_ids <- c(4, 3, 2, 1)
 
 # =========================
 # DOWNLOAD MASTER FROM DRIVE

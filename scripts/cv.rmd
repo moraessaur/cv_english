@@ -82,6 +82,19 @@ CV %<>% print_section("recent_professional_experience")
 
 \newpage
 
+::: aside
+
+<i class="fa-solid fa-globe"></i> Able to bridge business, data science, and engineering needs effectively
+
+<i class="fa-solid fa-chart-simple"></i></i> Expertise in Statistics, Machine Learning, and stakeholder management
+
+<i class="fa-solid fa-sitemap"></i> Experienced collaborating closely with MLOps teams on production systems
+
+<i class="fa-solid fa-cubes"></i> Active involvement in deploying, monitoring, and maintaining ML models in production
+
+
+:::
+
 Skills & Stack {#about-me data-icon=laptop-code}
 --------------------------------------------------------------------------------
 
