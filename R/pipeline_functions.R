@@ -558,85 +558,97 @@ generate_education_entries <- function(workbook_path) {
     )
 }
 
-generate_academic_entries <- function(
+generate_skills_stack_entries <- function(
   workbook_path,
-  variant = "balanced",
+  variant = "mlops_heavy",
   job_description = NULL,
+  recruiter_message = NULL,
   tailoring_brief = NULL,
   model = "gpt-4.1-mini",
   api_key = Sys.getenv("OPENAI_API_KEY"),
-  max_bullets = NULL
+  max_bullets_per_category = 2,
+  max_categories = NULL,
+  max_skills_per_category = NULL,
+  allow_lumping = TRUE
 ) {
-  academic <- read_excel(workbook_path, sheet = "academic_articles")
-
-  base_prompt <- read_file("prompts/base/base_rules.md")
-  variant_prompt <- read_file(file.path("prompts/stack_academic", paste0(variant, ".md")))
-
-  if (is.null(tailoring_brief)) {
-    tailoring_brief <- list(
-      overall_tone = "concise, technical, and business-oriented",
-      role_focus = "emphasize business impact, technical execution, and ownership",
-      academic_focus = "emphasize transferable analytical and technical strengths",
-      summary_focus = "position the candidate as a strong senior data scientist with practical delivery experience",
-      priority_keywords = character(0),
-      de_emphasize = character(0)
+  skills <- readxl::read_excel(workbook_path, sheet = "skills_stack") |>
+    dplyr::filter(
+      !is.na(Category),
+      !is.na(Description),
+      stringr::str_trim(as.character(Category)) != "",
+      stringr::str_trim(as.character(Description)) != ""
     )
+
+  if (!is.null(max_skills_per_category)) {
+    skills <- skills |>
+      dplyr::group_by(Category) |>
+      dplyr::slice_head(n = max_skills_per_category) |>
+      dplyr::ungroup()
   }
 
-  tailoring_text <- format_tailoring_brief(tailoring_brief, section = "academic")
-
-  if (is.null(max_bullets)) {
-    bullet_config <- list(
-      concise = 2,
-      brief = 2,
-      balanced = 3,
-      detailed = 5
+  grouped_skills <- skills |>
+    dplyr::group_by(Section) |>
+    dplyr::summarise(
+      source_text = paste(Description, collapse = "; "),
+      .groups = "drop"
     )
-    max_bullets <- bullet_config[[variant]] %||% 3
+
+  if (!is.null(max_categories)) {
+    grouped_skills <- grouped_skills |>
+      dplyr::slice_head(n = max_categories)
   }
 
-  out <- vector("list", nrow(academic))
+  prompt_path <- file.path("prompts/skills_stack", paste0(variant, ".md"))
 
-  for (i in seq_len(nrow(academic))) {
-    row <- academic[i, ]
+  if (!file.exists(prompt_path)) {
+    stop("Skills stack prompt not found: ", prompt_path)
+  }
 
-    source_text <- collapse_description_cols(row)
+  variant_prompt <- readr::read_file(prompt_path)
 
-    academic_loc <- if ("loc" %in% names(row)) as.character(row$loc) else NA_character_
-    academic_institution <- if ("institution" %in% names(row)) as.character(row$institution) else NA_character_
-    academic_start <- if ("start" %in% names(row)) as.character(row$start) else NA_character_
-    academic_end <- if ("end" %in% names(row)) as.character(row$end) else NA_character_
-    academic_in_resume <- if ("in_resume" %in% names(row)) row$in_resume else TRUE
+  out <- vector("list", nrow(grouped_skills))
 
-    jd_text <- if (!is.null(job_description) && nzchar(job_description)) {
-      paste0("\n\nJob description:\n", job_description)
+  for (i in seq_len(nrow(grouped_skills))) {
+    row <- grouped_skills[i, ]
+
+    jd_text <- if (!is.null(job_description) && nzchar(paste(job_description, collapse = ""))) {
+      paste0("\n\nJob description:\n", paste(job_description, collapse = "\n"))
+    } else {
+      ""
+    }
+
+    recruiter_text <- if (!is.null(recruiter_message) && nzchar(paste(recruiter_message, collapse = ""))) {
+      paste0("\n\nRecruiter message:\n", paste(recruiter_message, collapse = "\n"))
+    } else {
+      ""
+    }
+
+    tailoring_text <- if (!is.null(tailoring_brief)) {
+      format_tailoring_brief(tailoring_brief, section = "academic")
     } else {
       ""
     }
 
     prompt <- paste0(
-      base_prompt,
-      "\n\n---\n\n",
       variant_prompt,
       "\n\n---\n\n",
       tailoring_text,
-      "\n---\n\n",
-      "Academic / skills section information:\n",
-      "Title: ", as.character(row$title), "\n",
-      "Location: ", academic_loc, "\n",
-      "Institution: ", academic_institution, "\n",
-      "Start: ", academic_start, "\n",
-      "End: ", academic_end, "\n\n",
-      "Source text:\n",
-      source_text,
       jd_text,
+      recruiter_text,
+      "\n\n---\n\n",
+      "Skills category:\n",
+      row$Section,
+      "\n\nSource skills:\n",
+      row$source_text,
       "\n\n---\n\n",
       "Task:\n",
-      "Rewrite this academic / skills section into CV bullet points.\n",
-      "Tailor the bullets to the provided tailoring brief and job description if available.\n",
-      "Focus on transferable strengths and relevant technical foundations.\n",
-      "Use ONLY the information provided.\n",
-      "Do NOT invent experience, tools, results, employers, or metrics.\n",
+      "Create compact CV bullet points for this skills category.\n",
+      "Use ONLY the provided skills.\n",
+      "Do NOT invent tools, frameworks, domains, employers, or results.\n",
+      "Return at most ", max_bullets_per_category, " bullets.\n",
+      "IMPORTANT:\n",
+      "Prefer explicit technology names from the source text.\n",
+      "At least one concrete technology/library/platform should appear in every bullet.\n",
       "Return plain text only, one bullet per line."
     )
 
@@ -646,29 +658,32 @@ generate_academic_entries <- function(
       api_key = api_key
     )
 
-    bullets <- split_bullets(model_output, max_bullets = max_bullets)
+    bullets <- split_bullets(model_output, max_bullets = max_bullets_per_category)
+    bullets <- stringr::str_squish(bullets)
 
     desc <- rep(NA_character_, 5)
-    desc[1:length(bullets)] <- bullets
+    n_desc <- min(length(bullets), 5)
+    desc[seq_len(n_desc)] <- bullets[seq_len(n_desc)]
 
-    out[[i]] <- tibble(
-      section = "academic_articles",
-      title = as.character(row$title),
-      loc = academic_loc,
-      institution = academic_institution,
-      start = academic_start,
-      end = academic_end,
+    out[[i]] <- tibble::tibble(
+      section = "skills_stack",
+      title = as.character(row$Section),
+      loc = NA_character_,
+      institution = NA_character_,
+      start = NA_character_,
+      end = NA_character_,
       description_1 = desc[1],
       description_2 = desc[2],
       description_3 = desc[3],
       description_4 = desc[4],
       description_5 = desc[5],
-      in_resume = academic_in_resume
+      in_resume = TRUE
     )
   }
 
-  bind_rows(out)
+  dplyr::bind_rows(out)
 }
+
 
 pad_description_cols <- function(df, max_desc = 5) {
   for (i in seq_len(max_desc)) {
@@ -700,7 +715,10 @@ generate_cv_entries <- function(
   min_metrics_per_role = 1,
   max_details_keep = 2,
   max_achievements_keep = 2,
-  max_metrics_keep = 2
+  max_metrics_keep = 2,
+  max_skills_per_category = NULL,
+  allow_lumping = TRUE,
+  max_categories = NULL
 ) {
   tailoring_brief <- generate_tailoring_brief(
     job_description = job_description,
@@ -727,19 +745,23 @@ generate_cv_entries <- function(
 
   education_df <- generate_education_entries(workbook_path)
 
-  academic_df <- generate_academic_entries(
+  stack_df <- generate_skills_stack_entries(
     workbook_path = workbook_path,
     variant = academic_variant,
     job_description = job_description,
+    recruiter_message = recruiter_message,
     tailoring_brief = tailoring_brief,
     model = model,
     api_key = api_key,
-    max_bullets = academic_max_bullets
+    max_bullets_per_category = academic_max_bullets,
+    max_skills_per_category = max_skills_per_category,
+    allow_lumping = allow_lumping,
+    max_categories = max_categories
   )
 
-  bind_rows(
+  dplyr::bind_rows(
     pad_description_cols(roles_df),
     pad_description_cols(education_df),
-    pad_description_cols(academic_df)
+    pad_description_cols(stack_df)
   )
 }

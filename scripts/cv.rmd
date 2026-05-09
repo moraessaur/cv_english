@@ -15,19 +15,14 @@ output:
 
 ```{r, include=FALSE}
 knitr::opts_chunk$set(
-  results='asis', 
+  results = 'asis',
   echo = FALSE
 )
 
-library(magrittr) # For the pipe
-
-cat("CHUNK WD:", getwd(), "\n")
-cat("Exists R/...", file.exists("R/cv_printing_functions.r"), "\n")
-cat("Exists ../R/...", file.exists("../R/cv_printing_functions.r"), "\n")
+library(magrittr)
 
 source("cv_printing_functions.r")
 
-# Read in all data and initialize a CV printer object
 CV <- create_CV_object(
   data_location = params$data_location,
   pdf_mode = params$pdf_mode,
@@ -35,11 +30,9 @@ CV <- create_CV_object(
 )
 ```
 
-
 ```{r}
-# When in pdf export mode the little dots are unaligned, so fix that with some conditional CSS.
-if(params$pdf_mode) {
-    cat("
+if (params$pdf_mode) {
+  cat("
 <style>
 :root{
   --decorator-outer-offset-left: -6.5px;
@@ -48,7 +41,6 @@ if(params$pdf_mode) {
 }
 ```
 
-
 Main
 ================================================================================
 
@@ -56,10 +48,11 @@ Lucas Moraes {#title}
 --------------------------------------------------------------------------------
 
 <p align="justify">
+
 ```{r}
-# Note the special double pipe so we modify the CV object in place
-CV %<>% print_text_block("intro") 
+CV %<>% print_text_block("intro")
 ```
+
 </p>
 
 <br>
@@ -68,9 +61,10 @@ Relevant professional experience {data-icon=suitcase}
 --------------------------------------------------------------------------------
 
 ::: aside
-**Contact**
 
-<i class="fa fa-home"></i> [lucasmoraes.io](https://lucasmoraes.io)
+**Education & Contact**
+
+<i class="fa fa-envelope"></i> mSC & bSC in Genetics and Molecular Biology
 
 <i class="fa fa-envelope"></i> moraessaur@gmail.com
 
@@ -78,76 +72,43 @@ Relevant professional experience {data-icon=suitcase}
 
 <i class="fab fa-linkedin-in"></i> [LinkedIn](https://www.linkedin.com/in/lucas-moraes-msc-78944a32/)
 
+<i class="fas fa-award"></i> **Fluent English**
+
 :::
 
-
-
 ```{r}
-CV %<>% print_section('recent_professional_experience')
+CV %<>% print_section("recent_professional_experience")
 ```
-<br>
-<br>
-<br>
-<br>
-<br>
-<br>
-<br>
-<br>
-<br>
-<br>
 
-
-Education {data-icon=graduation-cap data-concise=true}
---------------------------------------------------------------------------------
+\newpage
 
 ::: aside
-```{r,eval=FALSE}
-# Tirei isso aqui com eval, eh a intro secundaria na barra lateral
-CV %<>% print_text_block('recent_professional_experience_aside')
-```
 
+<i class="fa-solid fa-globe"></i> Able to bridge business, data science, and engineering needs effectively
 
-**Technical stack**
-**__________________**
+<i class="fa-solid fa-chart-simple"></i></i> Expertise in Statistics, Machine Learning, and stakeholder management
 
-<i class="fa-solid fa-code-merge"></i> **Git**
+<i class="fa-solid fa-sitemap"></i> Experienced collaborating closely with MLOps teams on production systems
 
-<i class="fab fa-r-project"></i> **R**
+<i class="fa-solid fa-cubes"></i> Active involvement in deploying, monitoring, and maintaining ML models in production
 
-<i class="fab fa-python"></i> **Python**
-
-<i class="fa fa-database"></i> **SQL**
-
-<i class="fa-solid fa-star"></i> **Spark**
-
-<i class="fa-solid fa-circle-nodes"></i> **Data Bricks**
-
-<i class="fas fa-chart-bar"></i> **Statistics**
-
-<i class="fas fa-robot"></i> **Machine Learning**
-
-<i class="fas fa-chart-area"></i> **Data Viz**
-
-<i class="fas fa-award"></i> **Fluent english**
 
 :::
 
-
-
-```{r}
-CV %<>% print_section('education')
-```
-
-
-
-About me {data-icon=book}
+Skills & Stack {#about-me data-icon=laptop-code}
 --------------------------------------------------------------------------------
 
 ```{r}
-CV %<>% print_section('academic_articles')
+CV %<>% print_section(
+  "skills_stack",
+  glue_template = "
+<div class='skills-stack-entry'>
+
+<div class='skills-stack-title'>{title}</div>
+
+{description_bullets}
+
+</div>
+\n\n"
+)
 ```
-
-
-
-
-
