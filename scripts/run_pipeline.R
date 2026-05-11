@@ -22,25 +22,46 @@ source("R/pipeline_helpers.R")
 # CONFIG
 # =========================
 
-cfg <- make_pipeline_config(
-  file_stem = "huspy",
-  job_description_stem = "huspy",
-  recruiter_message_stem = NULL,
-  optional_obs = NULL,
-  role_variant = "retail",
-  academic_variant = "mlops_heavy",
-  role_max_bullets = 3,
-  academic_max_bullets = 4,
-  selected_role_ids = c(4, 3, 1),
-  source_file = "data/cv_new_reworked.xlsx",
-  workbook_path = "data/cv_main.xlsx",
-  render_xlsx_path = "data/cv_render_new.xlsx",
-  render_output_dir = "../renders",
-  drive_sheet_folder = "mimic_tear/renders/sheets",
-  input_file = "scripts/cv.rmd",
-  pdf_mode = TRUE
+library(jsonlite)
+
+config_path <- Sys.getenv(
+  "CV_PIPELINE_CONFIG",
+  unset = "configs/cv_pipeline_config.json"
 )
 
+if (!file.exists(config_path)) {
+  stop("Config file not found: ", config_path)
+}
+
+raw_config <- jsonlite::fromJSON(
+  config_path,
+  simplifyVector = FALSE
+)
+
+p <- raw_config$parameters
+
+`%||%` <- function(x, y) {
+  if (is.null(x)) y else x
+}
+
+cfg <- make_pipeline_config(
+  file_stem = p$file_stem,
+  job_description_stem = p$job_description_stem %||% NULL,
+  recruiter_message_stem = p$recruiter_message_stem %||% NULL,
+  optional_obs = p$optional_obs %||% NULL,
+  role_variant = p$role_variant,
+  academic_variant = p$academic_variant,
+  role_max_bullets = p$role_max_bullets,
+  academic_max_bullets = p$academic_max_bullets,
+  selected_role_ids = unlist(p$selected_role_ids),
+  source_file = p$source_file,
+  workbook_path = p$workbook_path,
+  render_xlsx_path = p$render_xlsx_path,
+  render_output_dir = p$render_output_dir,
+  drive_sheet_folder = p$drive_sheet_folder,
+  input_file = p$input_file,
+  pdf_mode = p$pdf_mode
+)
 
 # =========================
 # DOWNLOAD MASTER FROM GOOGLE DRIVE
@@ -49,7 +70,7 @@ cfg <- make_pipeline_config(
 drive_auth()
 
 drive_download(
-  file = as_id("1XoA9TXpG0P2LSh2jJ-lWGiy8zGNNdb81_wgnaxH-S4A"),
+  file = as_id(p$master_drive_file_id),
   path = cfg$workbook_path,
   type = "xlsx",
   overwrite = TRUE
@@ -78,8 +99,9 @@ entries <- generate_cv_entries(
   selected_role_ids = cfg$selected_role_ids,
   job_description = cfg$job_description,
   recruiter_message = cfg$recruiter_message,
-  max_categories = 5
-)
+  max_categories = p$max_categories,
+  use_expertise = p$use_expertise
+  )
 
 entries <- entries |>
   mutate(loc = institution) |>
@@ -202,7 +224,7 @@ if (!file.exists(html_path)) {
 
 html_file <- drive_upload(
   media = html_path,
-  path = "mimic_tear/renders/cvs/html",
+  path = p$html_drive_folder,
   name = basename(html_path),
   type = "text/html"
 )
@@ -229,7 +251,7 @@ if (cfg$pdf_mode) {
 
     pdf_file <- drive_upload(
       media = pdf_path,
-      path = "mimic_tear/renders/cvs/pdf",
+      path = p$pdf_drive_folder,
       name = basename(pdf_path),
       type = "application/pdf"
     )

@@ -69,6 +69,35 @@ collapse_description_cols <- function(df_row) {
   paste(vals, collapse = "\n")
 }
 
+pad_description_cols <- function(df, max_desc = 5) {
+  for (i in seq_len(max_desc)) {
+    col <- paste0("description_", i)
+
+    if (!col %in% names(df)) {
+      df[[col]] <- NA_character_
+    }
+  }
+
+  required_cols <- c(
+    "section", "title", "loc", "institution", "start", "end",
+    "description_1", "description_2", "description_3",
+    "description_4", "description_5", "in_resume"
+  )
+
+  for (col in required_cols) {
+    if (!col %in% names(df)) {
+      df[[col]] <- NA_character_
+    }
+  }
+
+  df %>%
+    dplyr::select(
+      section, title, loc, institution, start, end,
+      description_1, description_2, description_3,
+      description_4, description_5, in_resume
+    )
+}
+
 select_relevant_role_content <- function(
   role,
   role_detail_df,
@@ -406,7 +435,6 @@ generate_role_entries <- function(
       "None provided."
     }
 
-    # Use raw role_metrics_df so value + description always reach the prompt
     metrics_text <- if (nrow(role_metrics_df) > 0) {
       paste0(
         "- ", role_metrics_df$type, ": ",
@@ -569,9 +597,10 @@ generate_skills_stack_entries <- function(
   max_bullets_per_category = 2,
   max_categories = NULL,
   max_skills_per_category = NULL,
-  allow_lumping = TRUE
+  allow_lumping = TRUE,
+  use_expertise = FALSE
 ) {
-  skills <- readxl::read_excel(workbook_path, sheet = "skills_stack") |>
+  skills <- readxl::read_excel(workbook_path, sheet = "skills_stack") %>%
     dplyr::filter(
       !is.na(Category),
       !is.na(Description),
@@ -579,22 +608,73 @@ generate_skills_stack_entries <- function(
       stringr::str_trim(as.character(Description)) != ""
     )
 
+  if (!("Section" %in% names(skills))) {
+    skills <- skills %>%
+      dplyr::mutate(Section = Category)
+  }
+
+  if (use_expertise && "Expertise" %in% names(skills)) {
+    skills <- skills %>%
+      dplyr::mutate(
+        Expertise = stringr::str_to_lower(stringr::str_trim(as.character(Expertise))),
+        expertise_score = dplyr::case_when(
+          Expertise == "high" ~ 3,
+          Expertise == "medium" ~ 2,
+          Expertise == "low" ~ 1,
+          TRUE ~ 1
+        ),
+        expertise_instruction = dplyr::case_when(
+          Expertise == "high" ~ "Can be stated assertively as a strong skill.",
+          Expertise == "medium" ~ "Mention as practical experience, but avoid expert-level claims.",
+          Expertise == "low" ~ "Mention cautiously only if relevant; avoid strong claims.",
+          TRUE ~ "Mention cautiously."
+        )
+      ) %>%
+      dplyr::arrange(dplyr::desc(expertise_score))
+  } else {
+    skills <- skills %>%
+      dplyr::mutate(
+        Expertise = NA_character_,
+        expertise_score = 1,
+        expertise_instruction = ""
+      )
+  }
+
   if (!is.null(max_skills_per_category)) {
-    skills <- skills |>
-      dplyr::group_by(Category) |>
-      dplyr::slice_head(n = max_skills_per_category) |>
+    skills <- skills %>%
+      dplyr::group_by(Section) %>%
+      dplyr::arrange(dplyr::desc(expertise_score), .by_group = TRUE) %>%
+      dplyr::slice_head(n = max_skills_per_category) %>%
       dplyr::ungroup()
   }
 
-  grouped_skills <- skills |>
-    dplyr::group_by(Section) |>
+  grouped_skills <- skills %>%
+    dplyr::group_by(Section) %>%
     dplyr::summarise(
-      source_text = paste(Description, collapse = "; "),
+      source_text = paste(
+        paste0(
+          Description,
+          ifelse(
+            use_expertise,
+            paste0(
+              " [Expertise: ",
+              dplyr::coalesce(Expertise, "unspecified"),
+              " — ",
+              dplyr::coalesce(expertise_instruction, ""),
+              "]"
+            ),
+            ""
+          )
+        ),
+        collapse = "; "
+      ),
+      section_score = max(expertise_score, na.rm = TRUE),
       .groups = "drop"
-    )
+    ) %>%
+    dplyr::arrange(dplyr::desc(section_score))
 
   if (!is.null(max_categories)) {
-    grouped_skills <- grouped_skills |>
+    grouped_skills <- grouped_skills %>%
       dplyr::slice_head(n = max_categories)
   }
 
@@ -629,26 +709,37 @@ generate_skills_stack_entries <- function(
       ""
     }
 
+    expertise_text <- if (use_expertise) {
+      paste0(
+        "\n\nExpertise calibration is enabled.\n",
+        "Use expertise labels to calibrate wording strength:\n",
+        "- High: confident wording is allowed.\n",
+        "- Medium: use moderate wording; avoid expert-level claims.\n",
+        "- Low: mention cautiously only if relevant.\n",
+        "Prefer higher expertise skills when space is limited.\n"
+      )
+    } else {
+      ""
+    }
+
     prompt <- paste0(
       variant_prompt,
       "\n\n---\n\n",
       tailoring_text,
       jd_text,
       recruiter_text,
+      expertise_text,
       "\n\n---\n\n",
-      "Skills category:\n",
+      "Skills section:\n",
       row$Section,
       "\n\nSource skills:\n",
       row$source_text,
       "\n\n---\n\n",
       "Task:\n",
-      "Create compact CV bullet points for this skills category.\n",
+      "Create compact CV bullet points for this skills section.\n",
       "Use ONLY the provided skills.\n",
       "Do NOT invent tools, frameworks, domains, employers, or results.\n",
       "Return at most ", max_bullets_per_category, " bullets.\n",
-      "IMPORTANT:\n",
-      "Prefer explicit technology names from the source text.\n",
-      "At least one concrete technology/library/platform should appear in every bullet.\n",
       "Return plain text only, one bullet per line."
     )
 
@@ -663,7 +754,10 @@ generate_skills_stack_entries <- function(
 
     desc <- rep(NA_character_, 5)
     n_desc <- min(length(bullets), 5)
-    desc[seq_len(n_desc)] <- bullets[seq_len(n_desc)]
+
+    if (n_desc > 0) {
+      desc[seq_len(n_desc)] <- bullets[seq_len(n_desc)]
+    }
 
     out[[i]] <- tibble::tibble(
       section = "skills_stack",
@@ -684,23 +778,6 @@ generate_skills_stack_entries <- function(
   dplyr::bind_rows(out)
 }
 
-
-pad_description_cols <- function(df, max_desc = 5) {
-  for (i in seq_len(max_desc)) {
-    col <- paste0("description_", i)
-    if (!col %in% names(df)) {
-      df[[col]] <- NA_character_
-    }
-  }
-
-  df %>%
-    select(
-      section, title, loc, institution, start, end,
-      description_1, description_2, description_3, description_4, description_5,
-      in_resume
-    )
-}
-
 generate_cv_entries <- function(
   workbook_path,
   role_variant = "balanced",
@@ -718,7 +795,8 @@ generate_cv_entries <- function(
   max_metrics_keep = 2,
   max_skills_per_category = NULL,
   allow_lumping = TRUE,
-  max_categories = NULL
+  max_categories = NULL,
+  use_expertise = FALSE
 ) {
   tailoring_brief <- generate_tailoring_brief(
     job_description = job_description,
@@ -756,7 +834,8 @@ generate_cv_entries <- function(
     max_bullets_per_category = academic_max_bullets,
     max_skills_per_category = max_skills_per_category,
     allow_lumping = allow_lumping,
-    max_categories = max_categories
+    max_categories = max_categories,
+    use_expertise = use_expertise
   )
 
   dplyr::bind_rows(
