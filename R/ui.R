@@ -67,13 +67,109 @@ ui <- fluidPage(
       tabsetPanel(
 
         tabPanel(
-          "Run",
+          "CV run",
 
           h3("Logs"),
           verbatimTextOutput("logs"),
 
           h3("Generated files"),
           uiOutput("render_links")
+        ),
+
+        tabPanel(
+          "Forms",
+
+          h3("Application form generator"),
+
+          selectInput(
+            "form_mode",
+            "Form mode",
+            choices = c(
+              "Answer one question" = "question",
+              "Generate role summaries" = "summaries"
+            ),
+            selected = "question"
+          ),
+
+          textInput(
+            "form_file_stem",
+            "Form file stem",
+            value = "riachuelo"
+          ),
+
+          selectInput(
+            "form_job_description_stem",
+            "Job description",
+            choices = get_stems("prompts/job_descriptions"),
+            selected = "riachuelo"
+          ),
+
+          selectInput(
+            "form_recruiter_message_stem",
+            "Recruiter message",
+            choices = c("None" = "", get_stems("prompts/recruiter_messages")),
+            selected = ""
+          ),
+
+          selectInput(
+            "form_question_stem",
+            "Question file",
+            choices = get_stems("prompts/forms/questions"),
+            selected = NULL
+          ),
+
+          textAreaInput(
+            "form_question_text",
+            "Or paste form question directly",
+            value = "",
+            rows = 8,
+            width = "100%",
+            placeholder = "Paste the application form question here. If filled, this overrides the selected question file."
+          ),
+
+          textAreaInput(
+            "form_additional_guidance",
+            "Additional answer guidance",
+            value = "",
+            rows = 6,
+            width = "100%",
+            placeholder = "Optional: tone, emphasis, style, seniority, brevity, technical focus, business focus, word limit, etc."
+          ),
+
+          checkboxGroupInput(
+            "form_selected_role_ids",
+            "Selected role IDs",
+            choices = c(1, 2, 3, 4),
+            selected = c(4, 3, 2, 1)
+          ),
+
+          actionButton(
+            "generate_form_preview",
+            "Generate preview"
+          ),
+
+          actionButton(
+            "save_form_output",
+            "Save preview to file"
+          ),
+
+          hr(),
+
+          h3("Form logs"),
+          verbatimTextOutput("form_logs"),
+
+          h3("Saved output"),
+          uiOutput("form_output_path"),
+
+          h3("Editable preview"),
+
+          textAreaInput(
+            "form_output_preview",
+            "Generated preview",
+            value = "",
+            rows = 22,
+            width = "100%"
+          )
         ),
 
         tabPanel(
@@ -88,7 +184,9 @@ ui <- fluidPage(
               "Job descriptions" = "prompts/job_descriptions",
               "Recruiter messages" = "prompts/recruiter_messages",
               "Role/base variants" = "prompts/base",
-              "Skills stack variants" = "prompts/skills_stack"
+              "Skills stack variants" = "prompts/skills_stack",
+              "Form question prompts" = "prompts/forms/questions",
+              "Form system prompts" = "prompts/forms"
             ),
             selected = "prompts/job_descriptions"
           ),

@@ -2,41 +2,54 @@ library(shiny)
 
 source("R/helpers.R")
 source("R/run_cv_pipeline.R")
+source("R/run_form_pipeline_app.R")
 
 server <- function(input, output, session) {
 
   logs <- reactiveVal("Ready.")
   rendered_files <- reactiveVal(NULL)
+
+  form_logs <- reactiveVal("Ready.")
+  form_result <- reactiveVal(NULL)
+  form_saved_path <- reactiveVal(NULL)
+
   prompt_editor_status <- reactiveVal("Select a folder and file, or create a new .md file.")
   refresh_trigger <- reactiveVal(0)
 
   refresh_prompt_dropdowns <- function() {
-    updateSelectInput(
-      session,
-      "job_description_stem",
+    updateSelectInput(session, "job_description_stem",
       choices = get_stems("prompts/job_descriptions"),
       selected = input$job_description_stem
     )
 
-    updateSelectInput(
-      session,
-      "recruiter_message_stem",
+    updateSelectInput(session, "recruiter_message_stem",
       choices = c("None" = "", get_stems("prompts/recruiter_messages")),
       selected = input$recruiter_message_stem
     )
 
-    updateSelectInput(
-      session,
-      "role_variant",
+    updateSelectInput(session, "role_variant",
       choices = get_stems("prompts/base"),
       selected = input$role_variant
     )
 
-    updateSelectInput(
-      session,
-      "academic_variant",
+    updateSelectInput(session, "academic_variant",
       choices = get_stems("prompts/skills_stack"),
       selected = input$academic_variant
+    )
+
+    updateSelectInput(session, "form_job_description_stem",
+      choices = get_stems("prompts/job_descriptions"),
+      selected = input$form_job_description_stem
+    )
+
+    updateSelectInput(session, "form_recruiter_message_stem",
+      choices = c("None" = "", get_stems("prompts/recruiter_messages")),
+      selected = input$form_recruiter_message_stem
+    )
+
+    updateSelectInput(session, "form_question_stem",
+      choices = get_stems("prompts/forms/questions"),
+      selected = input$form_question_stem
     )
   }
 
@@ -151,7 +164,6 @@ server <- function(input, output, session) {
   observeEvent(input$clear_prompt, {
     updateTextAreaInput(session, "prompt_text", value = "")
     updateTextInput(session, "new_prompt_name", value = "")
-
     prompt_editor_status("Editor cleared.")
   })
 
@@ -194,12 +206,94 @@ server <- function(input, output, session) {
     logs(paste(result, collapse = "\n"))
   })
 
+  observeEvent(input$generate_form_preview, {
+
+    form_recruiter_message_stem <- if (input$form_recruiter_message_stem == "") {
+      NULL
+    } else {
+      input$form_recruiter_message_stem
+    }
+
+    form_saved_path(NULL)
+
+    result <- capture.output({
+
+      out <- run_form_pipeline_preview(
+        mode = input$form_mode,
+        file_stem = input$form_file_stem,
+        job_description_stem = input$form_job_description_stem,
+        recruiter_message_stem = form_recruiter_message_stem,
+        question_stem = input$form_question_stem,
+        question_text = input$form_question_text,
+        additional_guidance = input$form_additional_guidance,
+        selected_role_ids = as.numeric(input$form_selected_role_ids),
+        source_file = "data/cv_main.xlsx",
+        workbook_path = "data/cv_main.xlsx"
+      )
+
+      form_result(out)
+
+      updateTextAreaInput(
+        session,
+        "form_output_preview",
+        value = out$content
+      )
+    })
+
+    form_logs(paste(result, collapse = "\n"))
+  })
+
+  observeEvent(input$save_form_output, {
+
+    out <- form_result()
+
+    if (is.null(out)) {
+      showNotification("Generate a preview before saving.", type = "error")
+      return()
+    }
+
+    preview_text <- input$form_output_preview
+
+    if (is.null(preview_text) || !nzchar(trimws(preview_text))) {
+      showNotification("Preview is empty. Nothing to save.", type = "error")
+      return()
+    }
+
+    save_path <- save_form_preview_to_file(
+      content = preview_text,
+      file_stem = out$file_stem,
+      mode = out$mode,
+      output_dir = file.path("output/forms", out$file_stem)
+    )
+
+    form_saved_path(save_path)
+
+    showNotification(paste("Saved:", save_path), type = "message")
+  })
+
   output$logs <- renderText({
     logs()
   })
 
+  output$form_logs <- renderText({
+    form_logs()
+  })
+
   output$prompt_editor_status <- renderText({
     prompt_editor_status()
+  })
+
+  output$form_output_path <- renderUI({
+    path <- form_saved_path()
+
+    if (is.null(path)) {
+      return(tags$p("No file saved yet. Generate a preview, edit it if needed, then save."))
+    }
+
+    tagList(
+      tags$p(tags$b("Saved file:")),
+      tags$code(path)
+    )
   })
 
   output$render_links <- renderUI({
