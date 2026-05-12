@@ -12,11 +12,7 @@ ui <- fluidPage(
 
       h3("CV parameters"),
 
-      textInput(
-        "file_stem",
-        "File stem",
-        value = "nestle"
-      ),
+      textInput("file_stem", "File stem", value = "nestle"),
 
       selectInput(
         "job_description_stem",
@@ -28,10 +24,7 @@ ui <- fluidPage(
       selectInput(
         "recruiter_message_stem",
         "Recruiter message",
-        choices = c(
-          "None" = "",
-          get_stems("prompts/recruiter_messages")
-        ),
+        choices = c("None" = "", get_stems("prompts/recruiter_messages")),
         selected = ""
       ),
 
@@ -49,41 +42,15 @@ ui <- fluidPage(
         selected = "proficiency_calibrated"
       ),
 
-      numericInput(
-        "role_max_bullets",
-        "Role max bullets",
-        value = 3,
-        min = 1,
-        max = 10
-      ),
+      numericInput("role_max_bullets", "Role max bullets", value = 3, min = 1, max = 10),
 
-      numericInput(
-        "academic_max_bullets",
-        "Academic max bullets",
-        value = 4,
-        min = 1,
-        max = 10
-      ),
+      numericInput("academic_max_bullets", "Academic max bullets", value = 4, min = 1, max = 10),
 
-      sliderInput(
-        "max_categories",
-        "Max skill categories",
-        min = 1,
-        max = 10,
-        value = 3
-      ),
+      sliderInput("max_categories", "Max skill categories", min = 1, max = 10, value = 3),
 
-      checkboxInput(
-        "use_expertise",
-        "Use expertise calibration",
-        value = TRUE
-      ),
+      checkboxInput("use_expertise", "Use expertise calibration", value = TRUE),
 
-      checkboxInput(
-        "pdf_mode",
-        "Generate PDF",
-        value = TRUE
-      ),
+      checkboxInput("pdf_mode", "Generate PDF", value = TRUE),
 
       checkboxGroupInput(
         "selected_role_ids",
@@ -92,11 +59,7 @@ ui <- fluidPage(
         selected = c(4, 3, 1)
       ),
 
-      actionButton(
-        "render_cv",
-        "Render CV"
-      )
-
+      actionButton("render_cv", "Render CV")
     ),
 
     mainPanel(
@@ -107,11 +70,9 @@ ui <- fluidPage(
           "Run",
 
           h3("Logs"),
-
           verbatimTextOutput("logs"),
 
           h3("Generated files"),
-
           uiOutput("render_links")
         ),
 
@@ -138,10 +99,7 @@ ui <- fluidPage(
             choices = NULL
           ),
 
-          actionButton(
-            "load_prompt",
-            "Load selected file"
-          ),
+          actionButton("load_prompt", "Load selected file"),
 
           hr(),
 
@@ -159,14 +117,14 @@ ui <- fluidPage(
             width = "100%"
           ),
 
-          actionButton(
-            "save_prompt",
-            "Save / overwrite .md"
-          ),
+          actionButton("save_prompt", "Save / overwrite .md"),
+
+          actionButton("clear_prompt", "Clear editor"),
 
           actionButton(
-            "clear_prompt",
-            "Clear editor"
+            "delete_prompt",
+            "Delete selected .md",
+            class = "btn-danger"
           ),
 
           br(),
@@ -174,10 +132,7 @@ ui <- fluidPage(
 
           verbatimTextOutput("prompt_editor_status")
         )
-
       )
-
     )
-
   )
 )
