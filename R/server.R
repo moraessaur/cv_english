@@ -183,7 +183,7 @@ server <- function(input, output, session) {
       academic_variant = input$academic_variant,
       role_max_bullets = input$role_max_bullets,
       academic_max_bullets = input$academic_max_bullets,
-      selected_role_ids = as.numeric(input$selected_role_ids),
+      selected_role_ids = as.numeric(unname(input$selected_role_ids)),
       source_file = "data/cv_new_reworked.xlsx",
       workbook_path = "data/cv_main.xlsx",
       render_xlsx_path = "data/cv_render_new.xlsx",
@@ -207,7 +207,6 @@ server <- function(input, output, session) {
   })
 
   observeEvent(input$generate_form_preview, {
-
     form_recruiter_message_stem <- if (input$form_recruiter_message_stem == "") {
       NULL
     } else {
@@ -217,7 +216,6 @@ server <- function(input, output, session) {
     form_saved_path(NULL)
 
     result <- capture.output({
-
       out <- run_form_pipeline_preview(
         mode = input$form_mode,
         file_stem = input$form_file_stem,
@@ -226,7 +224,7 @@ server <- function(input, output, session) {
         question_stem = input$form_question_stem,
         question_text = input$form_question_text,
         additional_guidance = input$form_additional_guidance,
-        selected_role_ids = as.numeric(input$form_selected_role_ids),
+        selected_role_ids = as.numeric(unname(input$form_selected_role_ids)),
         source_file = "data/cv_main.xlsx",
         workbook_path = "data/cv_main.xlsx"
       )
@@ -244,7 +242,6 @@ server <- function(input, output, session) {
   })
 
   observeEvent(input$save_form_output, {
-
     out <- form_result()
 
     if (is.null(out)) {
