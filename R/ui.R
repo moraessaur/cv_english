@@ -42,41 +42,15 @@ ui <- fluidPage(
         selected = "proficiency_calibrated"
       ),
 
-      numericInput(
-        "role_max_bullets",
-        "Role max bullets",
-        value = 3,
-        min = 1,
-        max = 10
-      ),
+      numericInput("role_max_bullets", "Role max bullets", value = 3, min = 1, max = 10),
 
-      numericInput(
-        "academic_max_bullets",
-        "Academic max bullets",
-        value = 4,
-        min = 1,
-        max = 10
-      ),
+      numericInput("academic_max_bullets", "Academic max bullets", value = 4, min = 1, max = 10),
 
-      sliderInput(
-        "max_categories",
-        "Max skill categories",
-        min = 1,
-        max = 10,
-        value = 3
-      ),
+      sliderInput("max_categories", "Max skill categories", min = 1, max = 10, value = 3),
 
-      checkboxInput(
-        "use_expertise",
-        "Use expertise calibration",
-        value = TRUE
-      ),
+      checkboxInput("use_expertise", "Use expertise calibration", value = TRUE),
 
-      checkboxInput(
-        "pdf_mode",
-        "Generate PDF",
-        value = TRUE
-      ),
+      checkboxInput("pdf_mode", "Generate PDF", value = TRUE),
 
       checkboxGroupInput(
         "selected_role_ids",
@@ -85,10 +59,7 @@ ui <- fluidPage(
         selected = c(4, 3, 1)
       ),
 
-      actionButton(
-        "render_cv",
-        "Render CV"
-      )
+      actionButton("render_cv", "Render CV")
     ),
 
     mainPanel(
@@ -106,6 +77,33 @@ ui <- fluidPage(
         ),
 
         tabPanel(
+          "Rendered CVs",
+
+          h3("Recent HTML renders"),
+
+          actionButton(
+            "refresh_html_renders",
+            "Refresh render list"
+          ),
+
+          br(),
+          br(),
+
+          selectInput(
+            "selected_html_render",
+            "Select HTML render",
+            choices = html_render_choices(get_recent_html_renders()),
+            selected = NULL
+          ),
+
+          uiOutput("html_render_open_link"),
+
+          hr(),
+
+          uiOutput("html_render_preview")
+        ),
+
+        tabPanel(
           "Forms",
 
           h3("Application form generator"),
@@ -120,11 +118,7 @@ ui <- fluidPage(
             selected = "question"
           ),
 
-          textInput(
-            "form_file_stem",
-            "Form file stem",
-            value = "riachuelo"
-          ),
+          textInput("form_file_stem", "Form file stem", value = "riachuelo"),
 
           selectInput(
             "form_job_description_stem",
@@ -136,10 +130,7 @@ ui <- fluidPage(
           selectInput(
             "form_recruiter_message_stem",
             "Recruiter message",
-            choices = c(
-              "None" = "",
-              get_stems("prompts/recruiter_messages")
-            ),
+            choices = c("None" = "", get_stems("prompts/recruiter_messages")),
             selected = ""
           ),
 
@@ -175,15 +166,9 @@ ui <- fluidPage(
             selected = c(4, 3, 2, 1)
           ),
 
-          actionButton(
-            "generate_form_preview",
-            "Generate preview"
-          ),
+          actionButton("generate_form_preview", "Generate preview"),
 
-          actionButton(
-            "save_form_output",
-            "Save preview to file"
-          ),
+          actionButton("save_form_output", "Save preview to file"),
 
           hr(),
 
@@ -229,18 +214,11 @@ ui <- fluidPage(
             choices = NULL
           ),
 
-          actionButton(
-            "load_prompt",
-            "Load selected file"
-          ),
+          actionButton("load_prompt", "Load selected file"),
 
           hr(),
 
-          textInput(
-            "new_prompt_name",
-            "New file name without .md",
-            value = ""
-          ),
+          textInput("new_prompt_name", "New file name without .md", value = ""),
 
           textAreaInput(
             "prompt_text",
@@ -250,15 +228,9 @@ ui <- fluidPage(
             width = "100%"
           ),
 
-          actionButton(
-            "save_prompt",
-            "Save / overwrite .md"
-          ),
+          actionButton("save_prompt", "Save / overwrite .md"),
 
-          actionButton(
-            "clear_prompt",
-            "Clear editor"
-          ),
+          actionButton("clear_prompt", "Clear editor"),
 
           actionButton(
             "delete_prompt",

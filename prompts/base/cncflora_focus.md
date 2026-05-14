@@ -18,3 +18,4 @@ Rules:
 - This job values academic and research experience, value those in the skills/stack section, but keep it grounded in tone
 - Without overblowing it, try to leverage my management skills, set the done as if I have experience with it, but do not make me sound like a seasoned manager
 - Return plain text only.
+- I did not lead extinction risk assessments I actually made them, using cncfloras system and the IUCN category and criteria system.

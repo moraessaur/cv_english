@@ -15,6 +15,7 @@ server <- function(input, output, session) {
 
   prompt_editor_status <- reactiveVal("Select a folder and file, or create a new .md file.")
   refresh_trigger <- reactiveVal(0)
+  html_render_refresh <- reactiveVal(0)
 
   refresh_prompt_dropdowns <- function() {
     updateSelectInput(session, "job_description_stem",
@@ -52,6 +53,23 @@ server <- function(input, output, session) {
       selected = input$form_question_stem
     )
   }
+
+  observeEvent(input$refresh_html_renders, {
+    html_render_refresh(html_render_refresh() + 1)
+  })
+
+  observe({
+    html_render_refresh()
+
+    files <- get_recent_html_renders()
+
+    updateSelectInput(
+      session,
+      "selected_html_render",
+      choices = html_render_choices(files),
+      selected = if (length(files) > 0) files[[1]] else character(0)
+    )
+  })
 
   observe({
     refresh_trigger()
@@ -201,12 +219,14 @@ server <- function(input, output, session) {
       )
 
       rendered_files(rendered)
+      html_render_refresh(html_render_refresh() + 1)
     })
 
     logs(paste(result, collapse = "\n"))
   })
 
   observeEvent(input$generate_form_preview, {
+
     form_recruiter_message_stem <- if (input$form_recruiter_message_stem == "") {
       NULL
     } else {
@@ -242,6 +262,7 @@ server <- function(input, output, session) {
   })
 
   observeEvent(input$save_form_output, {
+
     out <- form_result()
 
     if (is.null(out)) {
@@ -293,6 +314,34 @@ server <- function(input, output, session) {
     )
   })
 
+  output$html_render_open_link <- renderUI({
+    req(input$selected_html_render)
+
+    web_path <- html_file_to_resource_path(input$selected_html_render)
+
+    tagList(
+      tags$p(tags$b("Selected file:")),
+      tags$code(input$selected_html_render),
+      tags$br(),
+      tags$a(
+        href = web_path,
+        target = "_blank",
+        "Open selected render in new tab"
+      )
+    )
+  })
+
+  output$html_render_preview <- renderUI({
+    req(input$selected_html_render)
+
+    web_path <- html_file_to_resource_path(input$selected_html_render)
+
+    tags$iframe(
+      src = web_path,
+      style = "width:100%; height:850px; border:1px solid #ccc; background:white;"
+    )
+  })
+
   output$render_links <- renderUI({
     files <- rendered_files()
 
@@ -300,21 +349,13 @@ server <- function(input, output, session) {
 
     tagList(
       tags$p(tags$b("HTML:")),
-      tags$a(
-        href = files$html_path,
-        files$html_path,
-        target = "_blank"
-      ),
+      tags$code(files$html_path),
 
+      tags$p(tags$b("PDF:")),
       if (!is.null(files$pdf_path)) {
-        tagList(
-          tags$p(tags$b("PDF:")),
-          tags$a(
-            href = files$pdf_path,
-            files$pdf_path,
-            target = "_blank"
-          )
-        )
+        tags$code(files$pdf_path)
+      } else {
+        tags$span("PDF not generated.")
       }
     )
   })
