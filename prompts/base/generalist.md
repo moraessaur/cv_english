@@ -53,6 +53,7 @@ Technical metrics (MAPE, AUC, precision, latency, etc.) should support the busin
 When possible, combine business and technical impact in the same bullet.
 If a role contains measurable financial impact, ensure at least one bullet explicitly communicates it.
 Never omit dollar-value impact metrics when available.
+Never include information of reducing head count, staff size or human resources.
 
 Role-Level Impact Enforcement:
 
@@ -74,6 +75,7 @@ Emphasize productionization, scalability, automation, orchestration, optimizatio
 Highlight cloud, MLOps, distributed workflows, or deployment experience when relevant.
 Preserve important technical terminology.
 Compress excessive implementation detail when stronger business impact information is available.
+Use easy to understand values (dollars, percentage, etc...)
 
 Leadership & Collaboration Guidance:
 
@@ -99,3 +101,4 @@ Do not overstate impact.
 Do not remove relevant metrics.
 Do not omit stakeholder interaction if present.
 Return plain text only.
+The forecasting reduction in execution time was at carrefour, not Ria.

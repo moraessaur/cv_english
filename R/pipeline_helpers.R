@@ -42,47 +42,121 @@ make_pipeline_config <- function(
   prefix_render_cv_html = "rendered_html",
   prefix_render_cv_pdf = "rendered_pdf"
 ) {
-  cv_id <- uuid::UUIDgenerate()
-  stamp <- format(Sys.time(), "%Y%m%d_%H%M%S")
 
-  job_description_path <- resolve_md_path(job_description_stem, "prompts/job_descriptions")
-  recruiter_message_path <- resolve_md_path(recruiter_message_stem, "prompts/recruiter_messages")
+  cv_id <- uuid::UUIDgenerate()
+
+  stamp <- format(
+    Sys.time(),
+    "%Y%m%d_%H%M%S"
+  )
+
+  job_description_path <- resolve_md_path(
+    job_description_stem,
+    "prompts/job_descriptions"
+  )
+
+  recruiter_message_path <- resolve_md_path(
+    recruiter_message_stem,
+    "prompts/recruiter_messages"
+  )
 
   jd_text <- read_optional_md(job_description_path)
-  recruiter_message <- read_optional_md(recruiter_message_path)
 
-  job_string <- if (!is.null(job_description_stem) && nzchar(job_description_stem)) {
+  recruiter_message <- read_optional_md(
+    recruiter_message_path
+  )
+
+  job_string <- if (
+    !is.null(file_stem) &&
+    nzchar(trimws(file_stem))
+  ) {
+
+    if (
+      !is.null(job_description_stem) &&
+      nzchar(trimws(job_description_stem))
+    ) {
+
+      paste0(
+        file_stem,
+        "_",
+        job_description_stem
+      )
+
+    } else {
+
+      file_stem
+    }
+
+  } else if (
+    !is.null(job_description_stem) &&
+    nzchar(trimws(job_description_stem))
+  ) {
+
     job_description_stem
-  } else if (!is.null(recruiter_message_stem) && nzchar(recruiter_message_stem)) {
+
+  } else if (
+    !is.null(recruiter_message_stem) &&
+    nzchar(trimws(recruiter_message_stem))
+  ) {
+
     recruiter_message_stem
-  } else if (!is.null(file_stem) && nzchar(file_stem)) {
-    file_stem
+
   } else {
+
     "cv_render"
   }
 
   if (is.null(optional_obs)) {
-    optional_obs <- if (!is.null(recruiter_message_path) && is.null(job_description_path)) {
+
+    optional_obs <- if (
+      !is.null(recruiter_message_path) &&
+      is.null(job_description_path)
+    ) {
+
       "recruiter_message"
-    } else if (!is.null(job_description_path) && is.null(recruiter_message_path)) {
+
+    } else if (
+      !is.null(job_description_path) &&
+      is.null(recruiter_message_path)
+    ) {
+
       "job_description"
-    } else if (!is.null(job_description_path) && !is.null(recruiter_message_path)) {
+
+    } else if (
+      !is.null(job_description_path) &&
+      !is.null(recruiter_message_path)
+    ) {
+
       "job_and_recruiter"
+
     } else {
+
       "generic"
     }
   }
 
-  dir.create(render_output_dir, recursive = TRUE, showWarnings = FALSE)
+  dir.create(
+    render_output_dir,
+    recursive = TRUE,
+    showWarnings = FALSE
+  )
 
   html_out <- file.path(
     render_output_dir,
-    glue::glue("{job_string}_{optional_obs}_{cv_id}_{stamp}.html")
+    glue::glue(
+      "{job_string}_{optional_obs}_{cv_id}_{stamp}.html"
+    )
   )
 
-  pdf_out <- sub("\\.html$", ".pdf", html_out)
+  pdf_out <- sub(
+    "\\.html$",
+    ".pdf",
+    html_out
+  )
 
-  render_sheet_name <- glue::glue("{job_string}_{optional_obs}_{cv_id}_{stamp}.xlsx")
+  render_sheet_name <- glue::glue(
+    "{job_string}_{optional_obs}_{cv_id}_{stamp}.xlsx"
+  )
 
   list(
     job_description = jd_text,
