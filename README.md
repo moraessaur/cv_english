@@ -1,3 +1,7 @@
+bash command to exec app 
+
+Rscript -e "shiny::runApp()"
+
 # 📄 CV Generator (LLM + RMarkdown + Google Sheets)
 
 A modular system to generate highly tailored CVs and application content using:
