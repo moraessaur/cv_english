@@ -49,6 +49,9 @@ cfg <- make_pipeline_config(
   job_description_stem = p$job_description_stem %||% NULL,
   recruiter_message_stem = p$recruiter_message_stem %||% NULL,
   optional_obs = p$optional_obs %||% NULL,
+  cv_context = p$cv_context %||% NULL,
+  role_context = p$role_context %||% NULL,
+  skills_context = p$skills_context %||% NULL,
   role_variant = p$role_variant,
   academic_variant = p$academic_variant,
   role_max_bullets = p$role_max_bullets,
@@ -99,6 +102,9 @@ entries <- generate_cv_entries(
   selected_role_ids = cfg$selected_role_ids,
   job_description = cfg$job_description,
   recruiter_message = cfg$recruiter_message,
+  cv_context = cfg$cv_context,
+  role_context = cfg$role_context,
+  skills_context = cfg$skills_context,
   max_categories = p$max_categories,
   use_expertise = p$use_expertise
   )

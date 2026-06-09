@@ -98,6 +98,146 @@ pad_description_cols <- function(df, max_desc = 5) {
     )
 }
 
+format_manual_guidance <- function(label, guidance = NULL) {
+  if (is.null(guidance) || !nzchar(trimws(paste(guidance, collapse = "\n")))) {
+    return("")
+  }
+
+  paste0(
+    label,
+    ":\n",
+    paste(guidance, collapse = "\n"),
+    "\n"
+  )
+}
+
+extract_required_guidance_terms <- function(guidance = NULL) {
+  if (is.null(guidance) || !nzchar(trimws(paste(guidance, collapse = "\n")))) {
+    return(character(0))
+  }
+
+  text <- paste(guidance, collapse = "\n")
+  patterns <- c(
+    "(?i)([^\\n.;:,]+?)\\s+(?:is|are)\\s+(?:obligatory|required|mandatory)\\b",
+    "(?i)\\bmust\\s+(?:include|mention|contain)\\s+([^\\n.;:,]+?)(?:\\s+in\\b|\\s+at least\\b|$)",
+    "(?i)\\binclude\\s+([^\\n.;:,]+?)(?:\\s+in\\b|\\s+at least\\b|$)"
+  )
+
+  terms <- unlist(lapply(patterns, function(pattern) {
+    matches <- regmatches(text, gregexpr(pattern, text, perl = TRUE))[[1]]
+
+    if (identical(matches, character(0)) || identical(matches, -1)) {
+      return(character(0))
+    }
+
+    trimws(sub(pattern, "\\1", matches, perl = TRUE))
+  }))
+
+  terms <- gsub("(?i)^that\\s+", "", terms, perl = TRUE)
+  terms <- gsub("(?i)\\s+be\\s+present$", "", terms, perl = TRUE)
+  terms <- trimws(terms)
+  unique(terms[nzchar(terms)])
+}
+
+guidance_tokens <- function(guidance = NULL) {
+  if (is.null(guidance) || !nzchar(trimws(paste(guidance, collapse = "\n")))) {
+    return(character(0))
+  }
+
+  tokens <- unlist(strsplit(tolower(paste(guidance, collapse = " ")), "[^a-z0-9]+"))
+  tokens <- tokens[nchar(tokens) >= 4]
+  stopwords <- c(
+    "must", "include", "mention", "contain", "obligatory", "required",
+    "mandatory", "present", "least", "bullet", "point", "section",
+    "skill", "skills", "guidance"
+  )
+
+  unique(setdiff(tokens, stopwords))
+}
+
+guidance_match_score <- function(text, guidance = NULL) {
+  tokens <- guidance_tokens(guidance)
+
+  if (length(tokens) == 0) {
+    return(rep(0L, length(text)))
+  }
+
+  text_lower <- tolower(text)
+
+  vapply(text_lower, function(x) {
+    score <- sum(vapply(tokens, function(token) grepl(token, x, fixed = TRUE), logical(1)))
+
+    if (
+      grepl("\\ba/?b\\s+testing\\b", tolower(paste(guidance, collapse = " ")), perl = TRUE) &&
+        grepl("experiment|hypothesis|causal", x, perl = TRUE)
+    ) {
+      score <- score + 10L
+    }
+
+    score
+  }, integer(1))
+}
+
+required_term_supported <- function(term, source_text) {
+  term_lower <- tolower(term)
+  source_lower <- tolower(source_text)
+
+  if (grepl(term_lower, source_lower, fixed = TRUE)) {
+    return(TRUE)
+  }
+
+  if (grepl("\\ba/?b\\s+testing\\b", term_lower, perl = TRUE)) {
+    return(grepl("experiment|hypothesis|causal", source_lower, perl = TRUE))
+  }
+
+  tokens <- guidance_tokens(term)
+  if (length(tokens) == 0) {
+    return(FALSE)
+  }
+
+  any(vapply(tokens, function(token) grepl(token, source_lower, fixed = TRUE), logical(1)))
+}
+
+format_required_term <- function(term) {
+  if (grepl("(?i)^a/?b\\s+testing$", term, perl = TRUE)) {
+    return("A/B testing")
+  }
+
+  term
+}
+
+ensure_required_terms_in_bullets <- function(bullets, required_terms, source_text) {
+  if (length(required_terms) == 0) {
+    return(bullets)
+  }
+
+  for (term in required_terms) {
+    term_display <- format_required_term(term)
+    already_present <- any(
+      grepl(tolower(term_display), tolower(bullets), fixed = TRUE),
+      na.rm = TRUE
+    )
+
+    if (already_present || !required_term_supported(term, source_text)) {
+      next
+    }
+
+    if (grepl("(?i)^a/?b\\s+testing$", term, perl = TRUE)) {
+      required_bullet <- "Applied A/B testing, experimental design, and hypothesis testing for analytical decision-making"
+    } else {
+      required_bullet <- paste0("Applied ", term_display, " in practical analytical workflows")
+    }
+
+    if (length(bullets) == 0) {
+      bullets <- required_bullet
+    } else {
+      bullets[1] <- required_bullet
+    }
+  }
+
+  bullets
+}
+
 select_relevant_role_content <- function(
   role,
   role_detail_df,
@@ -106,6 +246,8 @@ select_relevant_role_content <- function(
   tailoring_brief,
   job_description = NULL,
   recruiter_message = NULL,
+  cv_context = NULL,
+  role_context = NULL,
   model = "gpt-4.1-mini",
   api_key = Sys.getenv("OPENAI_API_KEY"),
   min_metrics_per_role = 1,
@@ -137,6 +279,10 @@ select_relevant_role_content <- function(
 
   job_description <- collapse_to_text(job_description)
   recruiter_message <- collapse_to_text(recruiter_message)
+  manual_guidance <- paste0(
+    format_manual_guidance("Manual CV guidance", cv_context),
+    format_manual_guidance("Manual role guidance", role_context)
+  )
 
   role_detail_df <- role_detail_df %>%
     mutate(
@@ -228,6 +374,7 @@ select_relevant_role_content <- function(
     ifelse(is.null(job_description), "", job_description), "\n\n",
     "Recruiter message:\n",
     ifelse(is.null(recruiter_message), "", recruiter_message), "\n\n",
+    if (nzchar(manual_guidance)) paste0(manual_guidance, "\n") else "",
     "Candidate items:\n",
     candidates_text, "\n\n",
     "Rules:\n",
@@ -353,6 +500,8 @@ generate_role_entries <- function(
   variant = "balanced",
   job_description = NULL,
   recruiter_message = NULL,
+  cv_context = NULL,
+  role_context = NULL,
   tailoring_brief = NULL,
   model = "gpt-4.1-mini",
   api_key = Sys.getenv("OPENAI_API_KEY"),
@@ -415,6 +564,8 @@ generate_role_entries <- function(
       tailoring_brief = tailoring_brief,
       job_description = job_description,
       recruiter_message = recruiter_message,
+      cv_context = cv_context,
+      role_context = role_context,
       model = model,
       api_key = api_key,
       min_metrics_per_role = min_metrics_per_role,
@@ -480,6 +631,17 @@ generate_role_entries <- function(
       ""
     }
 
+    manual_guidance <- paste0(
+      format_manual_guidance("Manual CV guidance", cv_context),
+      format_manual_guidance("Manual role guidance", role_context)
+    )
+
+    manual_guidance_text <- if (nzchar(manual_guidance)) {
+      paste0("\n\nManual generation guidance:\n", manual_guidance)
+    } else {
+      ""
+    }
+
     prompt <- paste0(
       base_prompt,
       "\n\n---\n\n",
@@ -508,11 +670,13 @@ generate_role_entries <- function(
       role_detail,
       jd_text,
       recruiter_text,
+      manual_guidance_text,
 
       "\n\n---\n\n",
       "Task:\n",
       "Write CV bullet points for this role.\n",
       "Tailor the bullets to the provided tailoring brief, job description, and recruiter message if available.\n",
+      "Follow the manual generation guidance when provided, while preserving factual accuracy.\n",
       "Prioritize skills, tools, achievements, metrics, and outcomes that match the target opportunity.\n",
       "Use only the information provided.\n\n",
 
@@ -591,6 +755,8 @@ generate_skills_stack_entries <- function(
   variant = "mlops_heavy",
   job_description = NULL,
   recruiter_message = NULL,
+  cv_context = NULL,
+  skills_context = NULL,
   tailoring_brief = NULL,
   model = "gpt-4.1-mini",
   api_key = Sys.getenv("OPENAI_API_KEY"),
@@ -671,7 +837,16 @@ generate_skills_stack_entries <- function(
       section_score = max(expertise_score, na.rm = TRUE),
       .groups = "drop"
     ) %>%
-    dplyr::arrange(dplyr::desc(section_score))
+    dplyr::mutate(
+      manual_guidance_score = guidance_match_score(
+        paste(Section, source_text),
+        skills_context
+      )
+    ) %>%
+    dplyr::arrange(
+      dplyr::desc(manual_guidance_score),
+      dplyr::desc(section_score)
+    )
 
   if (!is.null(max_categories)) {
     grouped_skills <- grouped_skills %>%
@@ -685,11 +860,22 @@ generate_skills_stack_entries <- function(
   }
 
   variant_prompt <- readr::read_file(prompt_path)
+  required_skill_terms <- extract_required_guidance_terms(skills_context)
+  included_required_terms <- character(0)
+
+  if (length(required_skill_terms) > 0) {
+    cat(
+      "Required skills terms detected:",
+      paste(format_required_term(required_skill_terms), collapse = ", "),
+      "\n"
+    )
+  }
 
   out <- vector("list", nrow(grouped_skills))
 
   for (i in seq_len(nrow(grouped_skills))) {
     row <- grouped_skills[i, ]
+    pending_required_terms <- setdiff(required_skill_terms, included_required_terms)
 
     jd_text <- if (!is.null(job_description) && nzchar(paste(job_description, collapse = ""))) {
       paste0("\n\nJob description:\n", paste(job_description, collapse = "\n"))
@@ -699,6 +885,17 @@ generate_skills_stack_entries <- function(
 
     recruiter_text <- if (!is.null(recruiter_message) && nzchar(paste(recruiter_message, collapse = ""))) {
       paste0("\n\nRecruiter message:\n", paste(recruiter_message, collapse = "\n"))
+    } else {
+      ""
+    }
+
+    manual_guidance <- paste0(
+      format_manual_guidance("Manual CV guidance", cv_context),
+      format_manual_guidance("Manual skills stack guidance", skills_context)
+    )
+
+    manual_guidance_text <- if (nzchar(manual_guidance)) {
+      paste0("\n\nManual generation guidance:\n", manual_guidance)
     } else {
       ""
     }
@@ -728,6 +925,7 @@ generate_skills_stack_entries <- function(
       tailoring_text,
       jd_text,
       recruiter_text,
+      manual_guidance_text,
       expertise_text,
       "\n\n---\n\n",
       "Skills section:\n",
@@ -737,6 +935,16 @@ generate_skills_stack_entries <- function(
       "\n\n---\n\n",
       "Task:\n",
       "Create compact CV bullet points for this skills section.\n",
+      "Follow the manual generation guidance when provided, while preserving factual accuracy.\n",
+      if (length(pending_required_terms) > 0) {
+        paste0(
+          "Hard manual requirements: include these exact term(s) when supported by the source skills: ",
+          paste(format_required_term(pending_required_terms), collapse = ", "),
+          ".\n"
+        )
+      } else {
+        ""
+      },
       "Use ONLY the provided skills.\n",
       "Do NOT invent tools, frameworks, domains, employers, or results.\n",
       "Return at most ", max_bullets_per_category, " bullets.\n",
@@ -751,6 +959,35 @@ generate_skills_stack_entries <- function(
 
     bullets <- split_bullets(model_output, max_bullets = max_bullets_per_category)
     bullets <- stringr::str_squish(bullets)
+    bullets <- ensure_required_terms_in_bullets(
+      bullets,
+      pending_required_terms,
+      row$source_text
+    )
+    newly_included_terms <- pending_required_terms[
+      vapply(pending_required_terms, function(term) {
+        any(grepl(
+          tolower(format_required_term(term)),
+          tolower(bullets),
+          fixed = TRUE
+        ), na.rm = TRUE)
+      }, logical(1))
+    ]
+
+    if (length(newly_included_terms) > 0) {
+      cat(
+        "Inserted required skills term(s) in",
+        as.character(row$Section),
+        ":",
+        paste(format_required_term(newly_included_terms), collapse = ", "),
+        "\n"
+      )
+    }
+
+    included_required_terms <- union(
+      included_required_terms,
+      newly_included_terms
+    )
 
     desc <- rep(NA_character_, 5)
     n_desc <- min(length(bullets), 5)
@@ -784,6 +1021,9 @@ generate_cv_entries <- function(
   academic_variant = "brief",
   job_description = NULL,
   recruiter_message = NULL,
+  cv_context = NULL,
+  role_context = NULL,
+  skills_context = NULL,
   model = "gpt-4.1-mini",
   api_key = Sys.getenv("OPENAI_API_KEY"),
   role_max_bullets = 4,
@@ -810,6 +1050,8 @@ generate_cv_entries <- function(
     variant = role_variant,
     job_description = job_description,
     recruiter_message = recruiter_message,
+    cv_context = cv_context,
+    role_context = role_context,
     tailoring_brief = tailoring_brief,
     model = model,
     api_key = api_key,
@@ -828,6 +1070,8 @@ generate_cv_entries <- function(
     variant = academic_variant,
     job_description = job_description,
     recruiter_message = recruiter_message,
+    cv_context = cv_context,
+    skills_context = skills_context,
     tailoring_brief = tailoring_brief,
     model = model,
     api_key = api_key,

@@ -18,10 +18,28 @@
     "example": null
   },
   "optional_obs": {
-    "description": "Extra instructions or observations injected into the tailoring process. Use null if absent.",
+    "description": "Output filename context label. If null, it is inferred from job/recruiter inputs.",
     "type": "string|null",
     "default": null,
-    "example": "Emphasize FMCG forecasting and stakeholder management."
+    "example": "job_and_recruiter"
+  },
+  "cv_context": {
+    "description": "Optional manual guidance applied across CV generation prompts.",
+    "type": "string|null",
+    "default": "",
+    "example": "Keep the CV concise and position me as a senior data scientist with strong product and engineering judgment."
+  },
+  "role_context": {
+    "description": "Optional manual guidance applied specifically to role evidence selection and work experience bullet generation.",
+    "type": "string|null",
+    "default": "",
+    "example": "For PicPay, emphasize segmentation, statistical rigor, and bridging analytics with software engineering."
+  },
+  "skills_context": {
+    "description": "Optional manual guidance applied specifically to Skills & Stack generation.",
+    "type": "string|null",
+    "default": "",
+    "example": "Prioritize forecasting, deployment, Python, SQL, and cloud tooling; de-emphasize dashboard-only skills."
   },
   "role_variant": {
     "description": "Prompt variant used when generating professional experience bullets.",

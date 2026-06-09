@@ -28,6 +28,11 @@ run_cv_pipeline <- function(
     overwrite = TRUE
   )
 
+  cat("\n=== CV generation guidance ===\n")
+  cat("Global CV guidance:", if (!is.null(cfg$cv_context) && nzchar(trimws(cfg$cv_context))) "yes" else "no", "\n")
+  cat("Role guidance:", if (!is.null(cfg$role_context) && nzchar(trimws(cfg$role_context))) "yes" else "no", "\n")
+  cat("Skills stack guidance:", if (!is.null(cfg$skills_context) && nzchar(trimws(cfg$skills_context))) "yes" else "no", "\n")
+
   language_skills <- read_excel(
     cfg$source_file,
     sheet = "language_skills"
@@ -60,6 +65,12 @@ run_cv_pipeline <- function(
     job_description = cfg$job_description,
 
     recruiter_message = cfg$recruiter_message,
+
+    cv_context = cfg$cv_context,
+
+    role_context = cfg$role_context,
+
+    skills_context = cfg$skills_context,
 
     max_categories = max_categories,
 
